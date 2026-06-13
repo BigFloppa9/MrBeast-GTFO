@@ -68,4 +68,4 @@ async def mrbeast(interaction: discord.Interaction, target: discord.Member):
         ephemeral=True
     )
 
-bot.run("YOUR_TOKEN_HERE")
+bot.run(os.environ["TOKEN"])
