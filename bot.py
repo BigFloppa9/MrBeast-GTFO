@@ -1,9 +1,13 @@
-import os
 import discord
 from discord.ext import commands
 from discord import app_commands
 import asyncio
 from datetime import timedelta, timezone, datetime
+import os
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -34,13 +38,20 @@ async def mrbeast(interaction: discord.Interaction, target: discord.Member):
     until = datetime.now(timezone.utc) + timedelta(days=1)
     try:
         await target.timeout(until, reason=TIMEOUT_REASON)
+        logger.info(f"Timed out {target} successfully")
     except discord.Forbidden:
         await interaction.followup.send("❌ No permission to timeout this user.", ephemeral=True)
+        return
+    except Exception as e:
+        logger.error(f"Timeout error: {e}")
+        await interaction.followup.send(f"❌ Timeout error: {e}", ephemeral=True)
         return
 
     # Delete messages across all channels (last 24h)
     deleted_total = 0
     cutoff = datetime.now(timezone.utc) - timedelta(days=1)
+
+    logger.info(f"Starting message deletion for {target} across {len(interaction.guild.text_channels)} channels")
 
     for channel in interaction.guild.text_channels:
         try:
@@ -49,18 +60,30 @@ async def mrbeast(interaction: discord.Interaction, target: discord.Member):
                 if msg.author.id == target.id:
                     messages_to_delete.append(msg)
 
-            # Bulk delete if possible (messages < 14 days old)
             if messages_to_delete:
+                logger.info(f"Found {len(messages_to_delete)} messages in #{channel.name}")
                 if len(messages_to_delete) == 1:
                     await messages_to_delete[0].delete()
                 else:
                     await channel.delete_messages(messages_to_delete)
                 deleted_total += len(messages_to_delete)
+                logger.info(f"Deleted {len(messages_to_delete)} messages in #{channel.name}")
+            else:
+                logger.info(f"No messages found in #{channel.name}")
 
-        except (discord.Forbidden, discord.HTTPException):
+        except discord.Forbidden:
+            logger.warning(f"No permission in #{channel.name} — skipping")
             continue
-        
-        await asyncio.sleep(0.5)  # avoid rate limits
+        except discord.HTTPException as e:
+            logger.error(f"HTTP error in #{channel.name}: {e}")
+            continue
+        except Exception as e:
+            logger.error(f"Unexpected error in #{channel.name}: {e}")
+            continue
+
+        await asyncio.sleep(0.5)
+
+    logger.info(f"Total deleted: {deleted_total}")
 
     await interaction.followup.send(
         f"✅ **{target.display_name}** has been timed out for 24 hours.\n"
