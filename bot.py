@@ -24,13 +24,8 @@ TIMEOUT_REASON = (
     "links. If you want a clean cheat site, use weao.gg. AND NEVER SCAN RANDOM QR-codes."
 )
 
-# log channel per guild — loaded from env on start, updated by /mrbeastlog
 log_channels: dict[int, int] = {}
-
-# { guild_id: { user_id: [ {time, channel_id, message} ] } }
 image_tracker: dict = defaultdict(lambda: defaultdict(list))
-
-# already processed users (won't trigger twice in a session)
 processed_users: dict = defaultdict(set)
 
 WINDOW_SECONDS = 10
@@ -39,7 +34,6 @@ MIN_CHANNELS = 2
 
 
 async def send_log(guild: discord.Guild, embed: discord.Embed):
-    """Send embed to the configured log channel for this guild."""
     log_channel_id = log_channels.get(guild.id)
     if not log_channel_id:
         log_channel_id = int(os.environ.get("LOG_CHANNEL_ID", 0))
@@ -48,18 +42,18 @@ async def send_log(guild: discord.Guild, embed: discord.Embed):
         return
     channel = guild.get_channel(log_channel_id)
     if not channel:
-        logger.warning(f"Log channel {log_channel_id} not found in guild.")
+        logger.warning(f"Log channel {log_channel_id} not found.")
         return
     perms = channel.permissions_for(guild.me)
     if not perms.send_messages or not perms.embed_links:
-        logger.warning(f"Missing send/embed permissions in log channel #{channel.name}")
+        logger.warning(f"Missing perms in log channel #{channel.name}")
         return
     try:
         await channel.send(embed=embed)
     except discord.Forbidden:
-        logger.warning(f"Forbidden when sending to log channel #{channel.name}")
+        logger.warning(f"Forbidden in log channel #{channel.name}")
     except discord.HTTPException as e:
-        logger.error(f"HTTP error sending to log channel: {e}")
+        logger.error(f"HTTP error in log channel: {e}")
 
 
 async def execute_mrbeast(
@@ -68,7 +62,6 @@ async def execute_mrbeast(
     trigger_message: discord.Message,
     source: str = "auto"
 ):
-    """Apply timeout and delete messages, then log."""
     until = datetime.now(timezone.utc) + timedelta(days=1)
     try:
         await target.timeout(until, reason=TIMEOUT_REASON)
@@ -86,7 +79,6 @@ async def execute_mrbeast(
     for channel in guild.text_channels:
         perms = channel.permissions_for(guild.me)
         if not perms.read_message_history or not perms.manage_messages:
-            logger.info(f"[{source}] Skipping #{channel.name} — no read/manage perms")
             continue
         try:
             messages_to_delete = []
@@ -123,23 +115,20 @@ async def execute_mrbeast(
         value=f"⏱️ Timed out for 24h\n🗑️ Deleted **{deleted_total}** messages",
         inline=False
     )
-    embed.set_footer(text=f"Detected in #{trigger_message.channel.name} • Source: {source}")
+    embed.set_footer(text=f"#{trigger_message.channel.name} • {source}")
     await send_log(guild, embed)
 
 
 @bot.event
 async def on_ready():
     await bot.tree.sync()
-    logger.info(f"Logged in as {bot.user}")
     print(f"Logged in as {bot.user}")
-
-    # Load log channel from env on startup
     env_log = int(os.environ.get("LOG_CHANNEL_ID", 0))
     if env_log:
         for guild in bot.guilds:
             if guild.id not in log_channels:
                 log_channels[guild.id] = env_log
-        logger.info(f"Loaded LOG_CHANNEL_ID={env_log} from environment")
+        logger.info(f"Loaded LOG_CHANNEL_ID={env_log} from env")
 
 
 @bot.event
@@ -155,7 +144,6 @@ async def on_message(message: discord.Message):
     )
     if not has_image:
         has_image = any(e.image or e.thumbnail for e in message.embeds)
-
     if not has_image:
         await bot.process_commands(message)
         return
@@ -169,13 +157,8 @@ async def on_message(message: discord.Message):
 
     now = datetime.now(timezone.utc)
     tracker = image_tracker[guild_id][user_id]
-    tracker.append({
-        "time": now,
-        "channel_id": message.channel.id,
-        "message": message
-    })
+    tracker.append({"time": now, "channel_id": message.channel.id, "message": message})
 
-    # Clean old events outside window
     image_tracker[guild_id][user_id] = [
         e for e in tracker
         if (now - e["time"]).total_seconds() <= WINDOW_SECONDS
@@ -221,7 +204,6 @@ async def mrbeast(interaction: discord.Interaction, target: discord.Member):
     for channel in interaction.guild.text_channels:
         perms = channel.permissions_for(interaction.guild.me)
         if not perms.read_message_history or not perms.manage_messages:
-            logger.info(f"[Manual] Skipping #{channel.name} — no perms")
             continue
         try:
             messages_to_delete = []
@@ -234,14 +216,11 @@ async def mrbeast(interaction: discord.Interaction, target: discord.Member):
                 else:
                     await channel.delete_messages(messages_to_delete)
                 deleted_total += len(messages_to_delete)
-                logger.info(f"[Manual] Deleted {len(messages_to_delete)} in #{channel.name}")
         except discord.HTTPException as e:
             logger.error(f"[Manual] HTTP error in #{channel.name}: {e}")
             continue
         await asyncio.sleep(0.5)
 
-    # Send log
-    dummy_msg = await interaction.original_response()
     embed = discord.Embed(
         title="🚨 MrBeast Triggered (Manual)",
         color=discord.Color.orange(),
@@ -267,53 +246,66 @@ async def mrbeast(interaction: discord.Interaction, target: discord.Member):
 @app_commands.describe(channel="Channel to send logs to")
 @app_commands.checks.has_permissions(administrator=True)
 async def mrbeastlog(interaction: discord.Interaction, channel: discord.TextChannel):
-    # Check bot permissions in that channel
     perms = channel.permissions_for(interaction.guild.me)
     missing = []
     if not perms.view_channel:
-        missing.append("`View Channel`")
+        missing.append("view_channel")
     if not perms.send_messages:
-        missing.append("`Send Messages`")
+        missing.append("send_messages")
     if not perms.embed_links:
-        missing.append("`Embed Links`")
+        missing.append("embed_links")
 
     if missing:
-        await interaction.response.send_message(
-            f"❌ I'm missing permissions in {channel.mention}:\n" + "\n".join(missing) +
-            "\n\nPlease fix channel permissions and try again.",
-            ephemeral=True
-        )
-        return
+        # Try to grant ourselves access via channel overwrite
+        try:
+            await channel.set_permissions(
+                interaction.guild.me,
+                view_channel=True,
+                send_messages=True,
+                embed_links=True,
+                reason="MrBeastLog: self-grant for log channel"
+            )
+            logger.info(f"Self-granted permissions in #{channel.name}")
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                f"❌ I can't access {channel.mention} and I also lack `Manage Channels` to fix it myself.\n\n"
+                f"Please go to **{channel.name} → Edit Channel → Permissions**, add me and allow:\n"
+                f"`View Channel`  `Send Messages`  `Embed Links`",
+                ephemeral=True
+            )
+            return
 
     log_channels[interaction.guild.id] = channel.id
-    logger.info(f"Log channel set to #{channel.name} ({channel.id}) for guild {interaction.guild.id}")
+    logger.info(f"Log channel set to #{channel.name} ({channel.id})")
     await interaction.response.send_message(
-        f"✅ Log channel set to {channel.mention}\n"
-        f"I have all required permissions there. Logs will be sent here from now on.\n"
-        f"⚠️ Note: this resets on bot restart. To make it permanent, add `LOG_CHANNEL_ID={channel.id}` to Railway Variables.",
+        f"✅ Log channel set to {channel.mention}!\n"
+        f"⚠️ To survive bot restarts, add this to Railway Variables:\n"
+        f"`LOG_CHANNEL_ID` = `{channel.id}`",
         ephemeral=True
     )
 
 
 @bot.tree.command(name="mrbeasttest", description="Diagnose bot permissions in a channel")
-@app_commands.describe(channel="Channel to check (leave empty to check current)")
+@app_commands.describe(channel="Channel to check (leave empty for current channel)")
 @app_commands.checks.has_permissions(administrator=True)
 async def mrbeasttest(interaction: discord.Interaction, channel: discord.TextChannel = None):
-    target_channel = channel or interaction.channel
-    perms = target_channel.permissions_for(interaction.guild.me)
+    target = channel or interaction.channel
+    perms = target.permissions_for(interaction.guild.me)
 
-    def status(b): return "✅" if b else "❌"
+    def s(b): return "✅" if b else "❌"
+
+    log_id = log_channels.get(interaction.guild.id) or int(os.environ.get("LOG_CHANNEL_ID", 0))
 
     report = (
-        f"**Permission check for {target_channel.mention}:**\n"
-        f"{status(perms.view_channel)} View Channel\n"
-        f"{status(perms.send_messages)} Send Messages\n"
-        f"{status(perms.embed_links)} Embed Links\n"
-        f"{status(perms.read_message_history)} Read Message History\n"
-        f"{status(perms.manage_messages)} Manage Messages (delete others' messages)\n"
-        f"{status(perms.moderate_members)} Moderate Members (timeout)\n\n"
-        f"**Current log channel:** "
-        + (f"<#{log_channels.get(interaction.guild.id)}>" if log_channels.get(interaction.guild.id) else "not set")
+        f"**Permission check for {target.mention}:**\n"
+        f"{s(perms.view_channel)} View Channel\n"
+        f"{s(perms.send_messages)} Send Messages\n"
+        f"{s(perms.embed_links)} Embed Links\n"
+        f"{s(perms.read_message_history)} Read Message History\n"
+        f"{s(perms.manage_messages)} Manage Messages\n"
+        f"{s(perms.manage_channels)} Manage Channels (needed for self-grant)\n"
+        f"{s(perms.moderate_members)} Moderate Members\n\n"
+        f"**Current log channel:** " + (f"<#{log_id}>" if log_id else "❌ not set")
     )
 
     await interaction.response.send_message(report, ephemeral=True)
