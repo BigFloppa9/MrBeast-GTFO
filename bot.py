@@ -256,7 +256,6 @@ async def mrbeastlog(interaction: discord.Interaction, channel: discord.TextChan
         missing.append("embed_links")
 
     if missing:
-        # Try to grant ourselves access via channel overwrite
         try:
             await channel.set_permissions(
                 interaction.guild.me,
