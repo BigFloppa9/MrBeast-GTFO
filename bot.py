@@ -108,7 +108,7 @@ async def execute_mrbeast(
     deleted_total = 0
     cutoff = datetime.now(timezone.utc) - timedelta(days=1)
 
-    for channel in guild.text_channels:
+    for channel in list(guild.text_channels) + list(guild.voice_channels):
         perms = channel.permissions_for(guild.me)
         if not perms.read_message_history or not perms.manage_messages:
             continue
@@ -228,7 +228,7 @@ async def mrbeast(interaction: discord.Interaction, target: discord.Member):
     deleted_total = 0
     cutoff = datetime.now(timezone.utc) - timedelta(days=1)
 
-    for channel in interaction.guild.text_channels:
+    for channel in list(interaction.guild.text_channels) + list(interaction.guild.voice_channels):
         perms = channel.permissions_for(interaction.guild.me)
         if not perms.read_message_history or not perms.manage_messages:
             continue
@@ -311,3 +311,4 @@ async def mrbeastlog(interaction: discord.Interaction, channel: discord.TextChan
 
 
 bot.run(os.environ["TOKEN"])
+
