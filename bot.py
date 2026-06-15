@@ -5,6 +5,7 @@ import asyncio
 from datetime import timedelta, timezone, datetime
 from collections import defaultdict
 import os
+import json
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -24,7 +25,13 @@ TIMEOUT_REASON = (
     "links. If you want a clean cheat site, use weao.gg. AND NEVER SCAN RANDOM QR-codes."
 )
 
+# Persistent storage path — Railway Volume must be mounted at /data
+DATA_DIR = "/data"
+SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
+
+# In-memory cache
 log_channels: dict[int, int] = {}
+
 image_tracker: dict = defaultdict(lambda: defaultdict(list))
 processed_users: dict = defaultdict(set)
 
@@ -33,16 +40,41 @@ MIN_IMAGES = 4
 MIN_CHANNELS = 2
 
 
+def load_settings():
+    """Load settings from disk into memory."""
+    global log_channels
+    try:
+        if os.path.exists(SETTINGS_FILE):
+            with open(SETTINGS_FILE, "r") as f:
+                data = json.load(f)
+            log_channels = {int(k): int(v) for k, v in data.get("log_channels", {}).items()}
+            logger.info(f"Loaded settings: {log_channels}")
+        else:
+            logger.info("No settings file found, starting fresh.")
+    except Exception as e:
+        logger.error(f"Failed to load settings: {e}")
+
+
+def save_settings():
+    """Save current settings to disk."""
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        data = {"log_channels": {str(k): v for k, v in log_channels.items()}}
+        with open(SETTINGS_FILE, "w") as f:
+            json.dump(data, f, indent=2)
+        logger.info(f"Settings saved: {data}")
+    except Exception as e:
+        logger.error(f"Failed to save settings: {e}")
+
+
 async def send_log(guild: discord.Guild, embed: discord.Embed):
     log_channel_id = log_channels.get(guild.id)
-    if not log_channel_id:
-        log_channel_id = int(os.environ.get("LOG_CHANNEL_ID", 0))
     if not log_channel_id:
         logger.warning("No log channel configured.")
         return
     channel = guild.get_channel(log_channel_id)
     if not channel:
-        logger.warning(f"Log channel {log_channel_id} not found.")
+        logger.warning(f"Log channel {log_channel_id} not found in guild.")
         return
     perms = channel.permissions_for(guild.me)
     if not perms.send_messages or not perms.embed_links:
@@ -121,14 +153,9 @@ async def execute_mrbeast(
 
 @bot.event
 async def on_ready():
+    load_settings()
     await bot.tree.sync()
     print(f"Logged in as {bot.user}")
-    env_log = int(os.environ.get("LOG_CHANNEL_ID", 0))
-    if env_log:
-        for guild in bot.guilds:
-            if guild.id not in log_channels:
-                log_channels[guild.id] = env_log
-        logger.info(f"Loaded LOG_CHANNEL_ID={env_log} from env")
 
 
 @bot.event
@@ -249,11 +276,11 @@ async def mrbeastlog(interaction: discord.Interaction, channel: discord.TextChan
     perms = channel.permissions_for(interaction.guild.me)
     missing = []
     if not perms.view_channel:
-        missing.append("view_channel")
+        missing.append("`View Channel`")
     if not perms.send_messages:
-        missing.append("send_messages")
+        missing.append("`Send Messages`")
     if not perms.embed_links:
-        missing.append("embed_links")
+        missing.append("`Embed Links`")
 
     if missing:
         try:
@@ -275,39 +302,12 @@ async def mrbeastlog(interaction: discord.Interaction, channel: discord.TextChan
             return
 
     log_channels[interaction.guild.id] = channel.id
+    save_settings()
     logger.info(f"Log channel set to #{channel.name} ({channel.id})")
     await interaction.response.send_message(
-        f"✅ Log channel set to {channel.mention}!\n"
-        f"⚠️ To survive bot restarts, add this to Railway Variables:\n"
-        f"`LOG_CHANNEL_ID` = `{channel.id}`",
+        f"✅ Log channel set to {channel.mention}! Saved permanently.",
         ephemeral=True
     )
-
-
-@bot.tree.command(name="mrbeasttest", description="Diagnose bot permissions in a channel")
-@app_commands.describe(channel="Channel to check (leave empty for current channel)")
-@app_commands.checks.has_permissions(administrator=True)
-async def mrbeasttest(interaction: discord.Interaction, channel: discord.TextChannel = None):
-    target = channel or interaction.channel
-    perms = target.permissions_for(interaction.guild.me)
-
-    def s(b): return "✅" if b else "❌"
-
-    log_id = log_channels.get(interaction.guild.id) or int(os.environ.get("LOG_CHANNEL_ID", 0))
-
-    report = (
-        f"**Permission check for {target.mention}:**\n"
-        f"{s(perms.view_channel)} View Channel\n"
-        f"{s(perms.send_messages)} Send Messages\n"
-        f"{s(perms.embed_links)} Embed Links\n"
-        f"{s(perms.read_message_history)} Read Message History\n"
-        f"{s(perms.manage_messages)} Manage Messages\n"
-        f"{s(perms.manage_channels)} Manage Channels (needed for self-grant)\n"
-        f"{s(perms.moderate_members)} Moderate Members\n\n"
-        f"**Current log channel:** " + (f"<#{log_id}>" if log_id else "❌ not set")
-    )
-
-    await interaction.response.send_message(report, ephemeral=True)
 
 
 bot.run(os.environ["TOKEN"])
