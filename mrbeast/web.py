@@ -8,7 +8,7 @@ from aiohttp import web
 
 from .bot import set_log_channel
 from .config import DEFAULT_REASON, LANGUAGES
-from .logstore import image_path
+from .logstore import read_image
 from .runner import clean_token, runner, validate_token
 from .security import CODE_TTL, MIN_PASSWORD_LENGTH
 from .state import state
@@ -218,13 +218,14 @@ async def api_logs(request: web.Request):
 
 
 async def api_image(request: web.Request):
-    path = image_path(request.match_info["name"])
-    if path is None:
+    name = request.match_info["name"]
+    data = await asyncio.to_thread(read_image, name)
+    if data is None:
         raise web.HTTPNotFound()
-    return web.FileResponse(
-        path,
+    return web.Response(
+        body=data,
         headers={
-            "Content-Type": CONTENT_TYPES[path.suffix[1:]],
+            "Content-Type": CONTENT_TYPES[name.rsplit(".", 1)[1]],
             "Cache-Control": "private, max-age=31536000, immutable",
             "Content-Disposition": "inline",
         },

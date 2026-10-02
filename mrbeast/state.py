@@ -9,7 +9,7 @@ class State:
         self.settings = GuildSettings()
         self.config = GlobalConfig()
         self.auth = AuthStore()
-        self.logs = LogStore()
+        self.logs = LogStore(self.auth.fernet)
         self.sessions = Sessions()
         self.reg_code = OneTimeCode()
         self.reset = ResetFlow()

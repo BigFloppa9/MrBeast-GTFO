@@ -163,9 +163,9 @@ Everything lives in the `data/` folder (excluded from git):
 | `secret.key` | the key used to encrypt the token |
 | `settings.json` | per-server settings |
 | `config.json` | languages and the linked moderator account |
-| `logs.json`, `images/` | the last 300 logs and the image cache |
+| `logs.json`, `images/` | logs (kept up to 30 days, max 300) and the image cache, both encrypted |
 
-The token is encrypted (Fernet) and the key sits in a separate file next to it, so the bot can start by itself after a restart. This protects against leaking a single file by accident, but not against someone who gets the whole `data/` folder. Do not publish or share it.
+The token, logs and images are encrypted (Fernet) and the key sits in a separate file next to it, so the bot can start by itself after a restart. This protects against leaking a single file by accident, but not against someone who gets the whole `data/` folder. Do not publish or share it.
 
 ---
 

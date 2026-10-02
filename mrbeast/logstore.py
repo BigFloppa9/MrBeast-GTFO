@@ -1,19 +1,30 @@
 import asyncio
 import hashlib
+import json
 import logging
 import os
 import re
 import time
 
-from .config import IMAGES_DIR, LOGS_FILE, ensure_dirs, read_json, write_bytes_atomic, write_json
+from cryptography.fernet import Fernet, InvalidToken
+
+from .config import IMAGES_DIR, LOGS_FILE, ensure_dirs, write_bytes_atomic
 
 logger = logging.getLogger("mrbeast.logs")
 
 MAX_LOGS = 300
+MAX_AGE = 30 * 86400
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_IMAGES_PER_LOG = 8
 FIELD_LIMIT = 69
 IMAGE_NAME = re.compile(r"^[0-9a-f]{64}\.(png|jpg|gif|webp)$")
+
+cipher: Fernet | None = None
+
+
+def set_cipher(value: Fernet):
+    global cipher
+    cipher = value
 
 
 def cut(text, limit: int = FIELD_LIMIT) -> str:
@@ -46,8 +57,18 @@ def store_image(data: bytes) -> str | None:
     if path.exists():
         os.utime(path, None)
     else:
-        write_bytes_atomic(path, data)
+        write_bytes_atomic(path, cipher.encrypt(data))
     return name
+
+
+def read_image(name: str) -> bytes | None:
+    path = image_path(name)
+    if path is None:
+        return None
+    try:
+        return cipher.decrypt(path.read_bytes())
+    except (OSError, InvalidToken):
+        return None
 
 
 def image_path(name: str):
@@ -58,12 +79,38 @@ def image_path(name: str):
 
 
 class LogStore:
-    def __init__(self):
-        raw = read_json(LOGS_FILE, {})
-        entries = raw.get("logs") if isinstance(raw, dict) else None
-        self.entries: list[dict] = entries if isinstance(entries, list) else []
+    def __init__(self, fernet: Fernet):
+        set_cipher(fernet)
+        self.entries: list[dict] = self.load()
         self.last_id = max([e.get("id", 0) for e in self.entries] + [0])
+        if not self.expire():
+            self.cleanup_images()
+
+    def load(self) -> list[dict]:
+        try:
+            raw = LOGS_FILE.read_bytes()
+        except OSError:
+            return []
+        try:
+            raw = cipher.decrypt(raw)
+        except InvalidToken:
+            pass
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            return []
+        entries = data.get("logs") if isinstance(data, dict) else None
+        return entries if isinstance(entries, list) else []
+
+    def expire(self) -> bool:
+        cutoff = time.time() - MAX_AGE
+        kept = [e for e in self.entries if e.get("ts", 0) >= cutoff]
+        if len(kept) == len(self.entries):
+            return False
+        self.entries = kept
+        self.save()
         self.cleanup_images()
+        return True
 
     def add(self, entry: dict) -> dict:
         entry_id = max(self.last_id + 1, int(time.time() * 1000))
@@ -71,6 +118,7 @@ class LogStore:
         entry["id"] = entry_id
         entry["ts"] = time.time()
         self.entries.append(entry)
+        self.expire()
         pruned = False
         while len(self.entries) > MAX_LOGS:
             self.entries.pop(0)
@@ -81,11 +129,13 @@ class LogStore:
         return entry
 
     def since(self, after: int = 0) -> list[dict]:
+        self.expire()
         return [e for e in self.entries if e["id"] > after]
 
     def save(self):
         try:
-            write_json(LOGS_FILE, {"logs": self.entries})
+            payload = json.dumps({"logs": self.entries}, ensure_ascii=False).encode("utf-8")
+            write_bytes_atomic(LOGS_FILE, cipher.encrypt(payload))
         except OSError as e:
             logger.error(f"Log save error: {e}")
 

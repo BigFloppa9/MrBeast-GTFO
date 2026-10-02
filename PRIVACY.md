@@ -18,11 +18,11 @@ Only when a user is punished (automatically or with the `/mrbeast` command) the 
 - the moderator's display name, username and ID for manual actions;
 - the applied action (timeout length, number of deleted messages) and the time.
 
-Only the latest 300 incident records are kept; older records and their images are deleted automatically.
+Incident records are kept for at most 30 days and never more than the latest 300 records; older records and their images are deleted automatically.
 
 The bot also stores per-server settings (timeout reason and length, delete period, log channel ID, detection thresholds), the chosen languages and, optionally, the ID and name of the Discord account linked as the control-panel moderator.
 
-The bot token is stored encrypted and the control-panel password only as a salted hash.
+Incident records and saved images are encrypted at rest (Fernet: AES-128-CBC with HMAC-SHA256 authentication) with a key stored on the same device. The bot token is encrypted the same way, and the control-panel password is stored only as a salted PBKDF2 hash.
 
 ## 3. Where the data is stored
 
@@ -34,7 +34,7 @@ If a server administrator selects a log channel, the bot posts a report there wi
 
 ## 5. Retention and deletion
 
-Incident records are kept until they are rotated out (see section 2) or until the operator deletes the `data/` folder. To request removal of data about you, open an issue at https://github.com/BigFloppa9/MrBeast-GTFO/issues or contact the person who runs the bot on your server. Removing the bot from a server stops all processing for that server.
+Incident records are deleted automatically after 30 days (or earlier, when more than 300 records exist), or when the operator deletes the `data/` folder. To request removal of data about you, open an issue at https://github.com/BigFloppa9/MrBeast-GTFO/issues or contact the person who runs the bot on your server. Removing the bot from a server stops all processing for that server.
 
 ## 6. Changes
 
@@ -44,4 +44,4 @@ This policy may be updated together with the source code; the current version is
 
 ## Кратко по-русски
 
-Бот читает сообщения только чтобы заметить, что один пользователь за несколько секунд разослал картинки по нескольким каналам. Сообщения обычных пользователей не сохраняются. При срабатывании сохраняется запись об инциденте: ID, имя и юзернейм нарушителя, первые 69 символов сообщения, канал, до 8 картинок (без видео) и применённое действие. Хранятся последние 300 записей. Все данные лежат в папке `data/` на устройстве того, кто запустил бота, никуда не передаются и не продаются. Удаление данных: через issue в репозитории или у владельца бота; удаление бота с сервера прекращает обработку.
+Бот читает сообщения только чтобы заметить, что один пользователь за несколько секунд разослал картинки по нескольким каналам. Сообщения обычных пользователей не сохраняются. При срабатывании сохраняется запись об инциденте: ID, имя и юзернейм нарушителя, первые 69 символов сообщения, канал, до 8 картинок (без видео) и применённое действие. Записи хранятся не дольше 30 дней (и не больше 300 штук) и шифруются. Все данные лежат в папке `data/` на устройстве того, кто запустил бота, никуда не передаются и не продаются. Удаление данных: через issue в репозитории или у владельца бота; удаление бота с сервера прекращает обработку.
