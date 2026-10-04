@@ -23,8 +23,10 @@ async def validate_token(token: str) -> tuple[bool, str]:
                     return True, ""
                 if resp.status == 401:
                     return False, "token_invalid"
+                logger.warning(f"Token check got HTTP {resp.status} from Discord")
                 return False, "token_http"
-    except (aiohttp.ClientError, asyncio.TimeoutError):
+    except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+        logger.warning(f"Token check could not reach Discord: {e!r}")
         return False, "token_network"
 
 

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -e
 
+export DEBIAN_FRONTEND=noninteractive
+export GIT_TERMINAL_PROMPT=0
+export PIP_NO_INPUT=1
+
 REPO_URL="https://github.com/BigFloppa9/MrBeast-GTFO.git"
 SELF="${BASH_SOURCE[0]:-}"
 DIR=""
@@ -23,6 +27,8 @@ fi
 
 echo "Environment: $ENV_KIND"
 
+APT_FLAGS=(-y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold)
+
 sudo_cmd() {
   if [ "$(id -u)" -eq 0 ]; then "$@"; elif command -v sudo >/dev/null 2>&1; then sudo "$@"; else "$@"; fi
 }
@@ -30,13 +36,14 @@ sudo_cmd() {
 install_system_packages() {
   case "$ENV_KIND" in
     termux)
-      pkg update -y
-      pkg install -y git python clang make libffi openssl python-cryptography
+      apt-get update || true
+      apt-get "${APT_FLAGS[@]}" full-upgrade
+      apt-get "${APT_FLAGS[@]}" install git python clang make libffi openssl python-cryptography
       ;;
     *)
       if command -v apt-get >/dev/null 2>&1; then
         sudo_cmd apt-get update || true
-        sudo_cmd apt-get install -y git python3 python3-venv python3-pip
+        sudo_cmd apt-get "${APT_FLAGS[@]}" install git python3 python3-venv python3-pip
       elif command -v dnf >/dev/null 2>&1; then
         sudo_cmd dnf install -y git python3 python3-pip
       elif command -v pacman >/dev/null 2>&1; then
@@ -78,5 +85,7 @@ fi
 
 echo
 echo "Installed in: $DIR"
-echo "Start the bot and the panel with:"
-echo "  cd \"$DIR\" && bash start.sh"
+echo "Starting. Next time use: cd \"$DIR\" && bash start.sh"
+echo
+
+exec bash "$DIR/start.sh"

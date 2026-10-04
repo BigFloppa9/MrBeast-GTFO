@@ -3,9 +3,11 @@ import logging
 import os
 import signal
 import socket
+import sys
 
 from aiohttp import web
 
+from .config import BASE_DIR
 from .state import state
 from .runner import runner
 from .web import create_app
@@ -92,6 +94,7 @@ async def main():
         await site_runner.cleanup()
         return
 
+    state.port = port
     print_banner(port)
 
     if state.auth.configured:
@@ -100,6 +103,7 @@ async def main():
             await runner.start(token)
 
     stop = asyncio.Event()
+    state.stop_event = stop
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
@@ -111,6 +115,11 @@ async def main():
     finally:
         await runner.stop()
         await site_runner.cleanup()
+
+    if state.restart:
+        os.environ["MRBEAST_PORT"] = str(state.port)
+        os.chdir(BASE_DIR)
+        os.execv(sys.executable, [sys.executable, "-m", "mrbeast"])
 
 
 if __name__ == "__main__":

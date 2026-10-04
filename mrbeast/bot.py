@@ -28,6 +28,16 @@ def lang() -> str:
     return state.config.bot_lang
 
 
+def is_admin_somewhere(bot: commands.Bot, user_id: int) -> bool:
+    for guild in bot.guilds:
+        if guild.owner_id == user_id:
+            return True
+        member = guild.get_member(user_id)
+        if member and member.guild_permissions.administrator:
+            return True
+    return False
+
+
 def trusted_media(url: str) -> bool:
     host = urlparse(url).hostname or ""
     return any(host == d or host.endswith("." + d) for d in MEDIA_DOMAINS)
@@ -403,6 +413,9 @@ class Guard(commands.Cog):
     @app_commands.allowed_contexts(guilds=False, dms=True, private_channels=False)
     async def reg(self, interaction: discord.Interaction, code: str):
         lg = lang()
+        if not is_admin_somewhere(self.bot, interaction.user.id):
+            await interaction.response.send_message(t(lg, "dm_reg_not_admin"))
+            return
         if not state.reg_code.consume(code):
             await interaction.response.send_message(t(lg, "dm_reg_bad"))
             return

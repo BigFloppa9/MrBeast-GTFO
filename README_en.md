@@ -1,190 +1,232 @@
-# 🦁 MrBeast GTFO
+<div align="center">
 
-**A test custom Discord moderation bot against the fraudulent "Mr. Beast" scam messages**
+<h1>🦁 MrBeast GTFO</h1>
 
-The bot spots an account that blasts the same images across several channels within seconds, puts it in timeout, deletes its messages and posts a report. The project was built for **Termux** from the start: the bot and its web control panel run right on your phone.
+<p><b>A test custom Discord moderation bot against the fraudulent "Mr. Beast" scam messages</b></p>
 
-🌍 **Language / Язык:** [Русский](README.md) · English
+<p>🌍 <b>Language / Язык:</b> <a href="README.md">Русский</a> · English</p>
+
+</div>
 
 ---
 
-## ✨ Features
+<h2 align="center">About</h2>
+
+The bot detects an account that blasts the same images across several channels within seconds, puts it in timeout, deletes its messages and posts a report. The project was designed for **Termux** from the start: the bot and its web control panel run directly on your phone.
+
+<h2 align="center">Features</h2>
 
 - 🚨 Auto-detection: N images in M channels within K seconds (defaults 4 / 2 / 10)
-- ⏱️ Timeout for the offender with a clear audit-log reason
-- 🗑️ Deletes the offender's messages across all channels for a chosen period
+- ⏱️ Timeout for the offender with an explanation in the audit log
+- 🗑️ Deletion of the offender's messages in all channels for a chosen period
 - 📋 Reports in a log channel and in the web panel
 - 🖥️ Dark Discord-style web panel: logs, status, per-server settings, languages
-- 🔐 Password login; the token and password are stored on the device in protected form
-- 🔑 Password reset through Discord (linked moderator account)
+- 🔄 Update the bot from the panel with one button, without reinstalling or losing data
+- 🔐 Password login; the token, password, logs and images are stored in protected form
+- 🔑 Password reset through Discord (linked administrator account)
+- 🧹 Removal of a user's data from the logs by username or ID
 - 🌐 English and Russian: bot language and panel language are separate settings
 
 ---
 
-## 📲 Install on Termux
+<h2 align="center">Install on Termux</h2>
 
-> Install Termux from **F-Droid** or **GitHub**; the Google Play version is outdated.
+> Install Termux from **F-Droid** or **GitHub**: the Google Play version is outdated.
 
-```bash
-pkg update -y && pkg install -y git
-git clone https://github.com/BigFloppa9/MrBeast-GTFO
-cd MrBeast-GTFO
-bash install.sh
-```
-
-The script detects where it runs (Termux, Docker or a regular Linux server) and installs everything needed.
-
-Start:
+One command installs all dependencies and starts the bot right away:
 
 ```bash
-bash start.sh
+pkg install -y git && git clone https://github.com/BigFloppa9/MrBeast-GTFO && cd MrBeast-GTFO && bash install.sh
 ```
 
-The console prints two links:
+The script detects where it runs (Termux, Docker or a regular Linux server) and installs everything without asking questions.
+
+After the start the console prints two links:
 
 ```
 http://192.168.x.x:8080   ← from any device on your Wi-Fi network
-http://localhost:8080     ← from the phone itself
+http://localhost:8080     ← from the device the bot runs on
 ```
 
-Open either one and finish the first-time setup. If port 8080 is busy, the next free port is used; the current address is always printed in the console.
+Open either one and complete the first-time setup. If port 8080 is busy, the next free port is used; the current address is always printed in the console.
 
-**Phone died or Termux was closed?** Open Termux and run:
+**Starting again** (after the phone was turned off or Termux was closed):
 
 ```bash
 cd MrBeast-GTFO && bash start.sh
 ```
 
-**Update:**
+<details>
+<summary><b>Reinstall and uninstall</b></summary>
+
+<br>
+
+If the installation is already done and you are inside the `MrBeast-GTFO` folder (after `cd`), running the install command again creates a folder inside the folder. Use the commands below to uninstall or reinstall.
+
+**Uninstall** (together with all data: token, settings, logs):
 
 ```bash
-cd MrBeast-GTFO && git pull
+cd ~ && rm -rf MrBeast-GTFO
 ```
 
-Then restart the bot (`Ctrl+C`, then `bash start.sh` again).
+**Reinstall from scratch** (data will be deleted):
 
-### Docker and other servers
+```bash
+cd ~ && rm -rf MrBeast-GTFO && pkg install -y git && git clone https://github.com/BigFloppa9/MrBeast-GTFO && cd MrBeast-GTFO && bash install.sh
+```
+
+**Reinstall keeping the data:**
+
+```bash
+cd ~ && cp -r MrBeast-GTFO/data ~/mrbeast-data-backup && rm -rf MrBeast-GTFO && git clone https://github.com/BigFloppa9/MrBeast-GTFO && cp -r ~/mrbeast-data-backup MrBeast-GTFO/data && cd MrBeast-GTFO && bash install.sh
+```
+
+A regular update does not require a reinstall: use the button in the panel (Settings section) or `cd MrBeast-GTFO && git pull`.
+
+</details>
+
+<details>
+<summary><b>Docker and other servers</b></summary>
+
+<br>
 
 Run `install.sh` inside the container or on the server the same way as in Termux. In Docker, publish the panel port with `-p 8080:8080`. Port, address and data folder can be set with environment variables:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `MRBEAST_PORT` | `8080` | First port for the panel (the next one is used if busy) |
+| `MRBEAST_PORT` | `8080` | First panel port (the next one is used if busy) |
 | `MRBEAST_HOST` | `0.0.0.0` | Listen address (`127.0.0.1` keeps the panel reachable from the device only) |
 | `MRBEAST_DATA_DIR` | `./data` | Folder for settings, logs and keys |
 
+</details>
+
 ---
 
-## 🤖 Creating the bot in Discord
+<h2 align="center">Creating the bot in Discord</h2>
 
 1. Open the [Discord Developer Portal](https://discord.com/developers/applications) and click **New Application**.
-2. **Bot** tab → **Reset Token** → copy the token. You need it during the panel's first setup. Never share it.
+2. Go to the **Bot** tab → **Reset Token** and copy the token. It is required during the panel's first setup. Do not share it with anyone.
 3. On the same page, under **Privileged Gateway Intents**, enable:
    - **Server Members Intent**
    - **Message Content Intent**
-4. **OAuth2 → URL Generator** tab:
+4. Go to **OAuth2 → URL Generator** and select:
    - **Scopes:** `bot` and `applications.commands`
    - **Bot Permissions** (the minimum, **required**):
 
-   | Permission | Why |
+   | Permission | Purpose |
    |---|---|
-   | View Channels | see channels |
-   | Read Message History | find the offender's messages |
-   | Manage Messages | delete the offender's messages |
-   | Moderate Members | apply timeouts |
-   | Send Messages | post reports in the log channel |
+   | View Channels | access to channels |
+   | Read Message History | finding the offender's messages |
+   | Manage Messages | deleting the offender's messages |
+   | Moderate Members | applying timeouts |
+   | Send Messages | reports in the log channel |
    | Embed Links | reports are sent as embeds |
 
 5. Open the generated URL at the bottom of the page and add the bot to your server.
 
-⚠️ **The bot's role must sit above the roles of the people it will punish** (Server Settings → Roles). Discord does not allow timeouts for administrators or the server owner.
+⚠️ **The bot's role must be above the roles of the users it applies timeouts to** (Server Settings → Roles). Discord does not allow timeouts for administrators or the server owner.
 
-If you want the bot to grant itself access to the log channel, also give it **Manage Channels** (optional). Without it, just allow the bot to post in the log channel manually.
+For the bot to grant itself access to the log channel, additionally give it **Manage Channels** (optional). Without it, allow the bot to post in the log channel manually.
 
 ---
 
-## 🖥️ First panel launch
+<h2 align="center">First panel launch</h2>
 
-1. Open the link from the console.
-2. Paste the **bot token**, choose a **panel password** (at least 8 characters), pick the panel and bot languages.
-3. Click **Save and start the bot**. The token is checked with Discord before it is saved.
+1. Open the link printed in the console.
+2. Paste the **bot token**, set a **panel password** (at least 8 characters) and choose the bot language. The panel language is switched with the EN / RU buttons in the top-left corner.
+3. Click **"Save and start the bot"**. The token is checked with Discord before saving. If Discord can't be reached (for example, it is unavailable at your provider), the data is still saved and the problem is shown in the panel.
 
-> Finish the setup right after starting: until it is done, whoever opens the link first becomes the panel owner. The panel runs over HTTP, so use it only on a trusted network.
+> Complete the setup right after starting: until it is done, whoever opens the link first becomes the panel owner. The panel runs over HTTP, so use it only on a trusted network.
 
-### Panel sections
+<h3 align="center">Panel sections</h3>
 
-| Section | What's inside |
+| Section | Contents |
 |---|---|
-| **Logs** | The last 300 actions as Discord-style messages: offender display name, username and ID, trigger text, channel link, images (identical ones stored once), action. Updates live |
+| **Logs** | Latest records as Discord-style messages: offender display name, username and ID, trigger text, channel link, images (identical ones stored once), action. Updates automatically |
 | **Status** | Bot state, ping, uptime, server list |
 | **Servers** | Per server: timeout reason, duration, delete period, log channel, auto-detection thresholds |
-| **Settings** | Panel and bot language, token replacement, moderator account link |
+| **Settings** | Languages, administrator account link, token replacement, updates, removal of a user's data |
 
-In the panel logs, offender fields, trigger text and channel names are cut to 69 characters so spam can't bloat the history. Videos are not saved.
+In the panel logs, offender fields, trigger text and channel names are cut to 69 characters so spam can't bloat the history. Videos are not saved. Records are kept for at most 30 days (and at most 300 records).
 
-### Moderator account and password reset
+<h3 align="center">Administrator account link and password reset</h3>
 
-Needed so the password can be recovered.
+The link is required to recover the password.
 
-1. In the panel: **Settings → Moderator account → Generate code**.
-2. Send the bot the command `/reg CODE` in **DIRECT** messages. The account is linked.
+1. In the panel open **Settings → Moderator account → Generate code**.
+2. Send the bot the command `/reg CODE` in **DIRECT** messages. The bot checks that you are an administrator (or the owner) of a server it works on and links your account by ID.
 
-If you forget the password:
+If the password is lost:
 
-1. Click **Forgot password?** on the sign-in page.
-2. Send the bot the command `/log` in **DIRECT** messages. The bot replies with a code to the linked account only.
-3. Enter the code in the panel, then the new password twice.
+1. Click **"Forgot password?"** on the sign-in page.
+2. Send the bot the command `/log` (no code) in **DIRECT** messages. The bot replies with a code to the linked account only.
+3. Enter the code in the browser, then enter the new password twice.
 
-If no account was linked, stop the panel, delete `data/auth.json` and start it again: the setup runs from scratch.
+If no account was linked, stop the panel, delete `data/auth.json` and start the bot again: the setup runs from scratch.
+
+<h3 align="center">Updating from the panel</h3>
+
+1. Open **Settings → Updates** and click **"Check for updates"**.
+2. If a new version is available, the list of changes is shown. Enter the panel password and click **"Update now"**.
+3. The bot stops, downloads the update, checks dependencies and the new files, and starts again. Data and settings are kept. If anything fails, the previous version is restored. After the restart you need to sign in again.
+
+<h3 align="center">Removing a user's data</h3>
+
+In **Settings → Remove user data** enter the username (not the display name) or the ID. The panel shows the number of matching records. After confirmation, the display name, username and ID in those records are replaced with `null`, and the stored message text and images are removed. A record with ID `null` is considered erased; a user whose name is literally "null" is not. Copies of reports in Discord itself (the log channel) are deleted by server administrators manually.
 
 ---
 
-## ⌨️ Discord commands
+<h2 align="center">Discord commands</h2>
 
-| Command | Where | Permission | What it does |
+| Command | Where | Permission | Purpose |
 |---|---|---|---|
 | `/mrbeast <user>` | server | Moderate Members | Manual timeout and message deletion |
 | `/mrbeastlog <channel>` | server | Administrator | Set the log channel |
 | `/mrbeastconfig` | server | Administrator | Reason, timeout (`1d`, `12h`, `30m`, `1d12h`, max `28d`) and delete period. Without arguments it shows current values |
-| `/reg <code>` | direct messages | anyone | Link the moderator account |
+| `/reg <code>` | direct messages | server administrator | Link the account |
 | `/log` | direct messages | linked account | Password reset code |
 
-Everything except `/mrbeast`, `/reg` and `/log` can also be done in the web panel.
+All settings except the manual `/mrbeast` are also available in the web panel.
 
 ---
 
-## 🔐 What is stored where
+<h2 align="center">Data storage</h2>
 
 Everything lives in the `data/` folder (excluded from git):
 
 | File | Contents |
 |---|---|
 | `auth.json` | the bot token in encrypted form and a password hash (PBKDF2-SHA256); the password itself is never stored |
-| `secret.key` | the key used to encrypt the token |
+| `secret.key` | the encryption key |
 | `settings.json` | per-server settings |
-| `config.json` | languages and the linked moderator account |
+| `config.json` | languages and the linked administrator account |
 | `logs.json`, `images/` | logs (kept up to 30 days, max 300) and the image cache, both encrypted |
 
-The token, logs and images are encrypted (Fernet) and the key sits in a separate file next to it, so the bot can start by itself after a restart. This protects against leaking a single file by accident, but not against someone who gets the whole `data/` folder. Do not publish or share it.
+The token, logs and images are encrypted (Fernet) and the key sits in a separate file next to them, so the bot can start by itself after a restart. This protects against leaking a single file by accident, but not against someone who gets the whole `data/` folder. Do not publish it or share it. Details: [privacy policy](PRIVACY.md).
 
 ---
 
-## 📱 Termux tips
+<h2 align="center">Termux recommendations</h2>
 
-- Disable battery optimization for Termux, otherwise Android may put the process to sleep.
-- `start.sh` enables `termux-wake-lock` so the phone doesn't put the process to sleep. Better not to dismiss the Termux notification.
+- Disable battery optimization for Termux, otherwise Android may suspend the process.
+- `start.sh` enables `termux-wake-lock` so the device doesn't put the process to sleep. It is better not to dismiss the Termux notification.
 - The phone and the device you open the panel from must be on the same network.
 
-## 🩺 Troubleshooting
+<h2 align="center">Troubleshooting</h2>
 
-| Problem | Fix |
+| Problem | Solution |
 |---|---|
-| "Discord rejected this token" | The token was copied partially or has been reset. Get a new one in the Developer Portal |
-| Panel mentions Intents | Enable **Server Members Intent** and **Message Content Intent**, then restart the bot |
-| Slash commands not visible | Wait a couple of minutes and restart Discord. The bot must be added with the `applications.commands` scope |
+| The panel says Discord can't be reached | Discord may be blocked by your provider: use a VPN or proxy on the device. The bot keeps retrying |
+| "Discord rejected this token" | The token was copied partially or has been reset. Get a new one in the Developer Portal and replace it in Settings |
+| The panel mentions Intents | Enable **Server Members Intent** and **Message Content Intent**, then restart the bot |
+| Slash commands are not visible | Wait a few minutes and restart Discord. The bot must be added with the `applications.commands` scope |
 | Timeout is not applied | The bot's role is below the user's role, or the user is an administrator |
 | No report in the log channel | Check the bot's permissions there: View Channel, Send Messages, Embed Links |
 
 ---
 
-Made by **BigFloppa9** with Claude
+<div align="center">
+
+<b>BigFloppa9</b>
+
+</div>

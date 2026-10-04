@@ -10,7 +10,7 @@ const I18N = {
     "setup.password_hint": "At least {n} characters. You will need it to open this panel.",
     "setup.repeat": "Repeat password",
     "setup.panel_lang": "Panel language",
-    "setup.bot_lang": "Bot language (messages in Discord)",
+    "setup.bot_lang": "Bot language",
     "setup.submit": "Save and start the bot",
     "login.title": "Welcome back",
     "login.lead": "Enter the panel password to continue.",
@@ -64,7 +64,40 @@ const I18N = {
     "status.no_servers": "The bot is not on any server yet. Invite it using the link from the README.",
     "status.err.token_invalid": "Discord rejected the token. Replace it in Settings.",
     "status.err.intents": "Enable Server Members Intent and Message Content Intent in the Developer Portal (Bot tab), then restart the bot.",
-    "status.err.network": "Can't reach Discord. The bot keeps retrying.",
+    "status.err.network": "Can't reach Discord from this device. If Discord is blocked by your provider, a VPN or proxy is needed. The bot keeps retrying.",
+    "setup.unverified": "Couldn't reach Discord to check the token. It was saved and the bot keeps trying to connect.",
+    "setup.bot_lang_hint": "Language of the messages the bot sends in Discord.",
+    "log.deleted": "[deleted]",
+    "update.title": "Updates",
+    "update.version": "Version {v} ({h})",
+    "update.check": "Check for updates",
+    "update.checking": "Checking…",
+    "update.latest": "You are running the latest version.",
+    "update.available": "Update available: {n} new change(s).",
+    "update.dirty": "Local files were modified, the update may fail and will be rolled back.",
+    "update.hint": "The bot stops, files and dependencies are updated and the bot starts again. Your data and settings are kept. You will need to sign in again.",
+    "update.password": "Panel password",
+    "update.apply": "Update now",
+    "update.running": "Updating…",
+    "update.step.stopping": "Stopping the bot",
+    "update.step.pulling": "Downloading the update",
+    "update.step.deps": "Checking dependencies",
+    "update.step.checking": "Verifying the new files",
+    "update.step.restarting": "Restarting",
+    "update.failed": "The update failed and the previous version was restored.",
+    "update.ok": "OK",
+    "privacy.title": "Remove user data",
+    "privacy.hint": "Replaces the display name, username and ID of a user in all log records with null and removes the stored text and images of their messages. Enter the username (not the display name) or the ID.",
+    "privacy.query": "Username or ID",
+    "privacy.find": "Find records",
+    "privacy.found": "Records found: {n}.",
+    "privacy.none": "No records found.",
+    "privacy.erase": "Erase data",
+    "privacy.done": "Data erased in {n} record(s).",
+    "err.query_empty": "Enter a username or ID.",
+    "err.not_git": "This installation is not a git checkout (or git is missing), so it can't be updated here.",
+    "err.fetch_failed": "Couldn't reach GitHub to check for updates.",
+    "err.update_running": "An update is already running.",
     "status.err.token_unreadable": "The saved token can't be read. Enter it again in Settings.",
     "servers.title": "Server settings",
     "servers.pick": "Server",
@@ -88,7 +121,7 @@ const I18N = {
     "settings.title": "Settings",
     "settings.languages": "Languages",
     "settings.panel_lang": "Panel language",
-    "settings.bot_lang": "Bot language (messages in Discord)",
+    "settings.bot_lang": "Bot language",
     "settings.token": "Bot token",
     "settings.token_hint": "The token is stored encrypted. Enter your panel password to replace it; the bot restarts with the new token.",
     "settings.password": "Panel password",
@@ -142,7 +175,7 @@ const I18N = {
     "setup.password_hint": "Не короче {n} символов. Он понадобится для входа в панель.",
     "setup.repeat": "Повторите пароль",
     "setup.panel_lang": "Язык панели",
-    "setup.bot_lang": "Язык бота (сообщения в Discord)",
+    "setup.bot_lang": "Язык бота",
     "setup.submit": "Сохранить и запустить бота",
     "login.title": "С возвращением",
     "login.lead": "Введите пароль от панели, чтобы продолжить.",
@@ -196,7 +229,40 @@ const I18N = {
     "status.no_servers": "Бот пока не добавлен ни на один сервер. Пригласите его по ссылке из README.",
     "status.err.token_invalid": "Discord отклонил токен. Замените его в настройках.",
     "status.err.intents": "Включите Server Members Intent и Message Content Intent в Developer Portal (вкладка Bot) и перезапустите бота.",
-    "status.err.network": "Нет связи с Discord. Бот продолжает пробовать подключиться.",
+    "status.err.network": "С этого устройства нет связи с Discord. Если Discord заблокирован у вашего провайдера, нужен VPN или прокси. Бот продолжает пробовать подключиться.",
+    "setup.unverified": "Не удалось связаться с Discord, чтобы проверить токен. Он сохранён, бот продолжает пытаться подключиться.",
+    "setup.bot_lang_hint": "Язык сообщений, которые бот отправляет в Discord.",
+    "log.deleted": "[удалено]",
+    "update.title": "Обновления",
+    "update.version": "Версия {v} ({h})",
+    "update.check": "Проверить обновления",
+    "update.checking": "Проверка…",
+    "update.latest": "Установлена последняя версия.",
+    "update.available": "Доступно обновление: изменений {n}.",
+    "update.dirty": "Локальные файлы изменены, обновление может не пройти и будет откачено.",
+    "update.hint": "Бот остановится, файлы и зависимости обновятся, затем бот запустится снова. Данные и настройки сохраняются. Потребуется заново войти в панель.",
+    "update.password": "Пароль панели",
+    "update.apply": "Обновить сейчас",
+    "update.running": "Обновление…",
+    "update.step.stopping": "Остановка бота",
+    "update.step.pulling": "Загрузка обновления",
+    "update.step.deps": "Проверка зависимостей",
+    "update.step.checking": "Проверка новых файлов",
+    "update.step.restarting": "Перезапуск",
+    "update.failed": "Обновление не удалось, прежняя версия восстановлена.",
+    "update.ok": "Понятно",
+    "privacy.title": "Удаление данных пользователя",
+    "privacy.hint": "Заменяет отображаемое имя, юзернейм и ID пользователя во всех записях логов на null и удаляет сохранённые текст и картинки его сообщений. Введите юзернейм (не отображаемое имя) или ID.",
+    "privacy.query": "Юзернейм или ID",
+    "privacy.find": "Найти записи",
+    "privacy.found": "Найдено записей: {n}.",
+    "privacy.none": "Записей не найдено.",
+    "privacy.erase": "Стереть данные",
+    "privacy.done": "Данные стёрты в записях: {n}.",
+    "err.query_empty": "Введите юзернейм или ID.",
+    "err.not_git": "Эта установка не является git-копией (или не установлен git), обновить её отсюда нельзя.",
+    "err.fetch_failed": "Не удалось связаться с GitHub для проверки обновлений.",
+    "err.update_running": "Обновление уже выполняется.",
     "status.err.token_unreadable": "Сохранённый токен не читается. Введите его заново в настройках.",
     "servers.title": "Настройки сервера",
     "servers.pick": "Сервер",
@@ -220,7 +286,7 @@ const I18N = {
     "settings.title": "Настройки",
     "settings.languages": "Языки",
     "settings.panel_lang": "Язык панели",
-    "settings.bot_lang": "Язык бота (сообщения в Discord)",
+    "settings.bot_lang": "Язык бота",
     "settings.token": "Токен бота",
     "settings.token_hint": "Токен хранится в зашифрованном виде. Для замены введите пароль панели; бот перезапустится с новым токеном.",
     "settings.password": "Пароль панели",
@@ -487,6 +553,7 @@ function renderMarkdown(text, parent) {
 }
 
 function personBlock(person) {
+  if (person.id === null) return h("div", { class: "fval person" }, h("div", { class: "muted" }, tr("log.deleted")));
   return h("div", { class: "fval person" },
     h("div", { class: "display" }, person.display),
     h("div", {}, person.username),
@@ -522,7 +589,7 @@ function logEntryNode(entry, bot) {
   if (entry.trigger) {
     const value = h("div", { class: "fval" });
     if (entry.trigger.text) renderMarkdown(entry.trigger.text, value);
-    else value.append(h("span", { class: "muted" }, tr("log.image")));
+    else value.append(h("span", { class: "muted" }, tr(entry.trigger.text === null ? "log.deleted" : "log.image")));
     const field = h("div", { class: "field" }, h("div", { class: "fname" }, tr("log.trigger")), value);
     if (entry.trigger.images && entry.trigger.images.length) {
       const thumbs = h("div", { class: "thumbs" });
@@ -617,16 +684,14 @@ function showError(box, message) {
   box.hidden = !message;
 }
 
-function renderSetup() {
+function renderSetup(prefill = {}) {
   stopTimers();
   const error = formError();
-  const token = h("input", { type: "password", autocomplete: "off", spellcheck: "false", required: true });
-  const password = h("input", { type: "password", autocomplete: "new-password", required: true });
-  const repeat = h("input", { type: "password", autocomplete: "new-password", required: true });
-  const panelLang = langSelect(LANG);
-  const botLang = langSelect("en");
+  const token = h("input", { type: "password", autocomplete: "off", spellcheck: "false", required: true, value: prefill.token || "" });
+  const password = h("input", { type: "password", autocomplete: "new-password", required: true, value: prefill.password || "" });
+  const repeat = h("input", { type: "password", autocomplete: "new-password", required: true, value: prefill.repeat || "" });
+  const botLang = langSelect(prefill.botLang || "en");
   const submit = h("button", { class: "btn block", type: "submit" }, tr("setup.submit"));
-  panelLang.addEventListener("change", () => { LANG = panelLang.value; storeLang(LANG); const snapshot = { t: token.value, p: password.value, r: repeat.value, b: botLang.value }; renderSetup(); restore(snapshot); });
 
   const form = h("form", {
     onsubmit: async (event) => {
@@ -635,13 +700,14 @@ function renderSetup() {
       submit.disabled = true;
       const res = await api("POST", "/api/setup", {
         token: token.value, password: password.value, repeat: repeat.value,
-        panel_lang: panelLang.value, bot_lang: botLang.value
+        panel_lang: LANG, bot_lang: botLang.value
       });
       submit.disabled = false;
       if (!res.ok) { showError(error, errorText(res)); return; }
       me.configured = true;
       me.authed = true;
       await enterDashboard();
+      if (res.warning) toast(tr("setup.unverified"), "error");
     }
   },
     h("h1", {}, tr("setup.title")),
@@ -650,18 +716,11 @@ function renderSetup() {
     field(tr("setup.token"), token, tr("setup.token_hint")),
     field(tr("setup.password"), password, tr("setup.password_hint", { n: me.min_password })),
     field(tr("setup.repeat"), repeat),
-    h("div", { class: "row" }, field(tr("setup.panel_lang"), panelLang), field(tr("setup.bot_lang"), botLang)),
+    field(tr("setup.bot_lang"), botLang, tr("setup.bot_lang_hint")),
     submit
   );
 
-  function restore(snapshot) {
-    const inputs = document.querySelectorAll("#app input, #app select");
-    if (inputs.length >= 5) {
-      inputs[0].value = snapshot.t; inputs[1].value = snapshot.p; inputs[2].value = snapshot.r; inputs[4].value = snapshot.b;
-    }
-  }
-
-  mount(authCard(form, () => { const snapshot = { t: token.value, p: password.value, r: repeat.value, b: botLang.value }; renderSetup(); restore(snapshot); }));
+  mount(authCard(form, () => renderSetup({ token: token.value, password: password.value, repeat: repeat.value, botLang: botLang.value })));
 }
 
 function renderLogin() {
@@ -796,6 +855,7 @@ function renderDashboard() {
   logs = [];
   lastLogId = 0;
   const content = h("div", { class: "content", id: "content" });
+  const banner = h("div", { class: "msg error banner", hidden: true, role: "alert" });
   const title = h("div", {});
   const pill = h("div", { class: "pill", id: "pill" });
   const nav = h("div", { class: "nav" });
@@ -813,6 +873,9 @@ function renderDashboard() {
   function paintPill() {
     const status = statusData && statusData.ok ? statusData.bot.status : "stopped";
     pill.replaceChildren(h("span", { class: stateDotClass(status) }), h("span", { class: "label" }, tr("state." + status)));
+    const problem = statusData && statusData.ok ? statusData.bot.error : "";
+    banner.textContent = problem ? tr("status.err." + problem) : "";
+    banner.hidden = !problem;
     const bot = statusData && statusData.ok ? statusData.bot.user : null;
     const holder = document.getElementById("brand-avatar");
     if (holder && bot) holder.replaceWith(Object.assign(avatarNode(bot), { id: "brand-avatar" }));
@@ -834,6 +897,7 @@ function renderDashboard() {
     h("aside", { class: "side" }, brand, nav, h("div", { class: "side-foot" }, pill)),
     h("section", { class: "main" },
       h("header", { class: "topbar" }, title, logout),
+      banner,
       content
     )
   ));
@@ -1053,6 +1117,92 @@ function renderModerator() {
   box.replaceChildren(...nodes);
 }
 
+function updateSection() {
+  const result = h("div", {});
+  const password = h("input", { type: "password", autocomplete: "current-password" });
+  const checkButton = h("button", { class: "btn secondary", type: "button", onclick: () => check() }, tr("update.check"));
+
+  async function check() {
+    checkButton.disabled = true;
+    result.replaceChildren(h("p", { class: "meta" }, tr("update.checking")));
+    const res = await api("GET", "/api/update/check");
+    checkButton.disabled = false;
+    if (!res.ok) { result.replaceChildren(h("div", { class: "msg error" }, errorText(res))); return; }
+    const nodes = [h("p", { class: "meta" }, tr("update.version", { v: res.version, h: res.head }))];
+    if (!res.behind) {
+      nodes.push(h("div", { class: "msg ok" }, tr("update.latest")));
+    } else {
+      nodes.push(h("div", { class: "msg info" }, tr("update.available", { n: res.behind })));
+      nodes.push(h("ul", { class: "changes" }, res.changes.map(line => h("li", {}, line))));
+      if (res.dirty) nodes.push(h("div", { class: "msg error" }, tr("update.dirty")));
+      nodes.push(h("p", { class: "meta" }, tr("update.hint")));
+      nodes.push(field(tr("update.password"), password));
+      nodes.push(h("div", { class: "actions" }, h("button", { class: "btn", type: "button", onclick: apply }, tr("update.apply"))));
+    }
+    result.replaceChildren(...nodes);
+  }
+
+  async function apply() {
+    const res = await api("POST", "/api/update/apply", { password: password.value });
+    if (!res.ok) { toast(errorText(res), "error"); return; }
+    stopTimers();
+    const label = h("p", { class: "meta" }, tr("update.running"));
+    result.replaceChildren(label);
+    const id = setInterval(async () => {
+      if (!me.authed) { clearInterval(id); return; }
+      const status = await api("GET", "/api/update/status");
+      if (!status.ok) return;
+      if (status.error) {
+        clearInterval(id);
+        result.replaceChildren(
+          h("div", { class: "msg error" }, tr("update.failed") + " (" + status.error + ")"),
+          status.detail ? h("pre", { class: "detail" }, status.detail) : null,
+          h("div", { class: "actions" }, h("button", { class: "btn secondary", type: "button", onclick: renderDashboard }, tr("update.ok")))
+        );
+        return;
+      }
+      if (status.step) label.textContent = tr("update.step." + status.step);
+    }, 1500);
+  }
+
+  return h("div", { class: "section" }, h("h3", {}, tr("update.title")), h("div", { class: "actions" }, checkButton), result);
+}
+
+function privacySection() {
+  const query = h("input", { type: "text", autocomplete: "off", spellcheck: "false", placeholder: "username / 766477798482509835" });
+  const out = h("div", {});
+  query.addEventListener("input", () => out.replaceChildren());
+
+  async function search() {
+    const q = query.value.trim();
+    if (!q) { out.replaceChildren(); return; }
+    const res = await api("POST", "/api/privacy/erase", { query: q, confirm: false });
+    if (!res.ok) { out.replaceChildren(h("div", { class: "msg error" }, errorText(res))); return; }
+    if (!res.count) { out.replaceChildren(h("div", { class: "msg info" }, tr("privacy.none"))); return; }
+    out.replaceChildren(
+      h("div", { class: "msg info" }, tr("privacy.found", { n: res.count })),
+      h("button", { class: "btn danger", type: "button", onclick: erase }, tr("privacy.erase"))
+    );
+  }
+
+  async function erase() {
+    const res = await api("POST", "/api/privacy/erase", { query: query.value.trim(), confirm: true });
+    if (!res.ok) { toast(errorText(res), "error"); return; }
+    query.value = "";
+    logs = [];
+    lastLogId = 0;
+    out.replaceChildren(h("div", { class: "msg ok" }, tr("privacy.done", { n: res.count })));
+  }
+
+  return h("div", { class: "section" },
+    h("h3", {}, tr("privacy.title")),
+    h("p", { class: "meta" }, tr("privacy.hint")),
+    field(tr("privacy.query"), query),
+    h("div", { class: "actions" }, h("button", { class: "btn secondary", type: "button", onclick: search }, tr("privacy.find"))),
+    out
+  );
+}
+
 function renderSettingsTab(content) {
   const panelLang = langSelect(me.panel_lang);
   const botLang = langSelect(me.bot_lang);
@@ -1101,10 +1251,36 @@ function renderSettingsTab(content) {
     h("div", { class: "section" }, h("h3", {}, tr("settings.languages")),
       h("div", { class: "row" }, field(tr("settings.panel_lang"), panelLang), field(tr("settings.bot_lang"), botLang))),
     moderatorSection(),
-    h("div", { class: "section" }, h("h3", {}, tr("settings.token")), h("p", { class: "meta" }, tr("settings.token_hint")), tokenForm)
+    h("div", { class: "section" }, h("h3", {}, tr("settings.token")), h("p", { class: "meta" }, tr("settings.token_hint")), tokenForm),
+    updateSection(),
+    privacySection()
   ));
   renderModerator();
 }
+
+const KOS_KEYS = "KeyK,KeyO,KeyS";
+let kosBuffer = [];
+let kosTimer = null;
+
+function typingNow() {
+  const el = document.activeElement;
+  return !!el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable);
+}
+
+function toggleKos() {
+  const on = document.documentElement.toggleAttribute("data-kos");
+  try { localStorage.setItem("mb_kos", on ? "1" : "0"); } catch (e) {}
+}
+
+try { if (localStorage.getItem("mb_kos") === "1") document.documentElement.setAttribute("data-kos", ""); } catch (e) {}
+
+document.addEventListener("keydown", (event) => {
+  if (event.ctrlKey || event.metaKey || event.altKey || event.repeat || typingNow()) { kosBuffer = []; return; }
+  kosBuffer = kosBuffer.concat(event.code).slice(-3);
+  clearTimeout(kosTimer);
+  kosTimer = setTimeout(() => { kosBuffer = []; }, 2000);
+  if (kosBuffer.join() === KOS_KEYS) { kosBuffer = []; toggleKos(); }
+});
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {

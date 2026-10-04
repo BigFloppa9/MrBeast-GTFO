@@ -15,6 +15,10 @@ class State:
         self.reset = ResetFlow()
         self.limiter = LoginLimiter()
         self.runner = None
+        self.update = {"running": False, "step": "", "error": "", "detail": ""}
+        self.restart = False
+        self.stop_event = None
+        self.port = 0
 
 
 state = State()

@@ -34,7 +34,7 @@ If a server administrator selects a log channel, the bot posts a report there wi
 
 ## 5. Retention and deletion
 
-Incident records are deleted automatically after 30 days (or earlier, when more than 300 records exist), or when the operator deletes the `data/` folder. To request removal of data about you, open an issue at https://github.com/BigFloppa9/MrBeast-GTFO/issues or contact the person who runs the bot on your server. Removing the bot from a server stops all processing for that server.
+Incident records are deleted automatically after 30 days (or earlier, when more than 300 records exist), or when the operator deletes the `data/` folder. To request removal of data about you, open an issue at https://github.com/BigFloppa9/MrBeast-GTFO/issues or contact the person who runs the bot on your server. The operator can also erase all records about a specific user (found by username or ID) in the control panel: the display name, username and ID in those records are replaced with null and the stored message text and images are removed. Removing the bot from a server stops all processing for that server.
 
 ## 6. Changes
 
@@ -44,4 +44,4 @@ This policy may be updated together with the source code; the current version is
 
 ## Кратко по-русски
 
-Бот читает сообщения только чтобы заметить, что один пользователь за несколько секунд разослал картинки по нескольким каналам. Сообщения обычных пользователей не сохраняются. При срабатывании сохраняется запись об инциденте: ID, имя и юзернейм нарушителя, первые 69 символов сообщения, канал, до 8 картинок (без видео) и применённое действие. Записи хранятся не дольше 30 дней (и не больше 300 штук) и шифруются. Все данные лежат в папке `data/` на устройстве того, кто запустил бота, никуда не передаются и не продаются. Удаление данных: через issue в репозитории или у владельца бота; удаление бота с сервера прекращает обработку.
+Бот читает сообщения только чтобы заметить, что один пользователь за несколько секунд разослал картинки по нескольким каналам. Сообщения обычных пользователей не сохраняются. При срабатывании сохраняется запись об инциденте: ID, имя и юзернейм нарушителя, первые 69 символов сообщения, канал, до 8 картинок (без видео) и применённое действие. Записи хранятся не дольше 30 дней (и не больше 300 штук) и шифруются. Все данные лежат в папке `data/` на устройстве того, кто запустил бота, никуда не передаются и не продаются. Удаление данных: через issue в репозитории или у владельца бота (в панели есть стирание записей по юзернейму или ID: имя, юзернейм и ID заменяются на null, текст и картинки удаляются); удаление бота с сервера прекращает обработку.

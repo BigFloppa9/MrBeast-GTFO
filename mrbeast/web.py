@@ -12,6 +12,7 @@ from .logstore import read_image
 from .runner import clean_token, runner, validate_token
 from .security import CODE_TTL, MIN_PASSWORD_LENGTH
 from .state import state
+from .updater import apply as apply_update, check as check_update
 from .utils import apply_patch, fmt_duration
 
 logger = logging.getLogger("mrbeast.web")
@@ -24,7 +25,7 @@ PUBLIC_API = {
 }
 CSP = (
     "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
-    "img-src 'self' data: https://cdn.discordapp.com https://media.discordapp.net; "
+    "img-src 'self' data: https://cdn.discordapp.com https://media.discordapp.net https://sun1-13.userapi.com; "
     "base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 )
 CONTENT_TYPES = {"png": "image/png", "jpg": "image/jpeg", "gif": "image/gif", "webp": "image/webp"}
@@ -89,9 +90,10 @@ async def index(request: web.Request):
 
 async def static_file(request: web.Request):
     name = request.match_info["name"]
-    if name not in ("app.js", "app.css"):
+    path = STATIC_DIR / name
+    if name not in ("app.js", "app.css", "kos.jpg") or not path.is_file():
         raise web.HTTPNotFound()
-    return web.FileResponse(STATIC_DIR / name, headers={"Cache-Control": "no-cache"})
+    return web.FileResponse(path, headers={"Cache-Control": "no-cache"})
 
 
 async def api_state(request: web.Request):
@@ -123,13 +125,13 @@ async def api_setup(request: web.Request):
     if err:
         return fail(err)
     valid, reason = await validate_token(token)
-    if not valid:
+    if not valid and reason == "token_invalid":
         return fail(reason)
     await asyncio.to_thread(state.auth.set_password, data["password"])
     state.auth.set_token(token)
     state.config.set_languages(bot_lang=data.get("bot_lang"), panel_lang=data.get("panel_lang"))
     await runner.start(token)
-    response = ok()
+    response = ok(warning="" if valid else reason)
     attach_session(response)
     return response
 
@@ -326,15 +328,43 @@ async def api_token_put(request: web.Request):
     if not token:
         return fail("token_empty")
     valid, reason = await validate_token(token)
-    if not valid:
+    if not valid and reason == "token_invalid":
         return fail(reason)
     state.auth.set_token(token)
     await runner.start(token)
-    return ok()
+    return ok(warning="" if valid else reason)
 
 
 async def api_moderator_code(request: web.Request):
     return ok(code=state.reg_code.issue(), ttl=CODE_TTL)
+
+
+async def api_erase(request: web.Request):
+    data = await read_body(request)
+    query = str(data.get("query") or "").strip()
+    if not query.lstrip("@"):
+        return fail("query_empty")
+    return ok(count=state.logs.erase(query, bool(data.get("confirm"))))
+
+
+async def api_update_check(request: web.Request):
+    result = await check_update()
+    return ok(**{k: v for k, v in result.items() if k != "ok"}) if result["ok"] else fail(result["error"], detail=result.get("detail", ""))
+
+
+async def api_update_apply(request: web.Request):
+    data = await read_body(request)
+    password = data.get("password")
+    if not (isinstance(password, str) and await asyncio.to_thread(state.auth.verify_password, password)):
+        return fail("bad_password", 401)
+    if state.update["running"]:
+        return fail("update_running", 409)
+    asyncio.create_task(apply_update())
+    return ok()
+
+
+async def api_update_status(request: web.Request):
+    return ok(**state.update)
 
 
 def create_app() -> web.Application:
@@ -356,4 +386,8 @@ def create_app() -> web.Application:
     app.router.add_put("/api/config", api_config_put)
     app.router.add_put("/api/token", api_token_put)
     app.router.add_post("/api/moderator/code", api_moderator_code)
+    app.router.add_post("/api/privacy/erase", api_erase)
+    app.router.add_get("/api/update/check", api_update_check)
+    app.router.add_post("/api/update/apply", api_update_apply)
+    app.router.add_get("/api/update/status", api_update_status)
     return app

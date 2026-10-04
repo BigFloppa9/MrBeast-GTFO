@@ -139,7 +139,39 @@ class LogStore:
         except OSError as e:
             logger.error(f"Log save error: {e}")
 
-    def cleanup_images(self):
+    def erase(self, query: str, apply: bool = False) -> int:
+        q = query.strip().lstrip("@")
+        if not q:
+            return 0
+
+        def same(person) -> bool:
+            if not isinstance(person, dict):
+                return False
+            ident, name = person.get("id"), person.get("username")
+            return (isinstance(ident, str) and ident == q) or (isinstance(name, str) and name.lower() == q.lower())
+
+        hits = 0
+        for entry in self.entries:
+            offender, moderator = entry.get("offender"), entry.get("moderator")
+            as_offender, as_moderator = same(offender), same(moderator)
+            if not (as_offender or as_moderator):
+                continue
+            hits += 1
+            if not apply:
+                continue
+            for person, matched in ((offender, as_offender), (moderator, as_moderator)):
+                if matched:
+                    person["display"] = person["username"] = person["id"] = None
+            trigger = entry.get("trigger")
+            if as_offender and trigger:
+                trigger["text"] = None
+                trigger["images"] = []
+        if apply and hits:
+            self.save()
+            self.cleanup_images(force=True)
+        return hits
+
+    def cleanup_images(self, force: bool = False):
         ensure_dirs()
         used = set()
         for entry in self.entries:
@@ -147,7 +179,7 @@ class LogStore:
             for image in trigger.get("images", []):
                 used.add(image.get("file"))
         try:
-            fresh = time.time() - 300
+            fresh = time.time() - (0 if force else 300)
             for path in IMAGES_DIR.iterdir():
                 if path.name not in used and path.stat().st_mtime < fresh:
                     path.unlink(missing_ok=True)
