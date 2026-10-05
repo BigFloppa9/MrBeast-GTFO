@@ -14,6 +14,9 @@ CONFIG_FILE = DATA_DIR / "config.json"
 AUTH_FILE = DATA_DIR / "auth.json"
 KEY_FILE = DATA_DIR / "secret.key"
 LOGS_FILE = DATA_DIR / "logs.json"
+PROXIES_FILE = DATA_DIR / "proxies.json"
+BIN_DIR = DATA_DIR / "bin"
+XRAY_DIR = DATA_DIR / "xray"
 
 MAX_TIMEOUT_MINUTES = 28 * 1440
 MAX_DELETE_WINDOW_MINUTES = 365 * 1440

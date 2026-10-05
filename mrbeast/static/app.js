@@ -94,7 +94,38 @@ const I18N = {
     "privacy.none": "No records found.",
     "privacy.erase": "Erase data",
     "privacy.done": "Data erased in {n} record(s).",
+    "proxy.title": "Proxy",
+    "proxy.hint": "Use this if Discord is blocked at your provider. Paste proxy links or a full Xray/V2Ray config, one link per line: socks5://user:pass@host:port, http://host:port, vless://… or a JSON config. Up to {max} entries; the bot tries them in order and switches to the next one if the current one stops working.",
+    "proxy.placeholder": "socks5://127.0.0.1:2080\nhttp://127.0.0.1:10809\nvless://uuid@host:443?type=tcp&security=reality&…\n{ JSON config }",
+    "proxy.add": "Add",
+    "proxy.empty": "No proxies added. The bot connects directly.",
+    "proxy.count": "{n} / {max}",
+    "proxy.active": "in use",
+    "proxy.ok": "works",
+    "proxy.failed": "not working",
+    "proxy.unknown": "not checked yet",
+    "proxy.remove": "Remove",
+    "proxy.added": "Added: {n}.",
+    "proxy.skipped": "Skipped: {list}.",
+    "proxy.item": "item {n}: {text}",
+    "proxy.xray_downloading": "Downloading the Xray core (needed for SOCKS5 and VLESS)…",
+    "proxy.xray_error": "Couldn't download the Xray core: {detail}. Place the xray binary at data/bin/xray manually, or install it so that it is available as xray.",
     "err.query_empty": "Enter a username or ID.",
+    "err.proxy_invalid": "Nothing could be added.",
+    "err.proxy_limit": "The proxy limit is reached.",
+    "err.proxy_missing": "This proxy no longer exists.",
+    "err.empty": "Paste at least one proxy.",
+    "err.bad_link": "the link is malformed",
+    "err.bad_uuid": "the VLESS id is not a valid UUID",
+    "err.bad_reality": "REALITY needs the pbk (public key) parameter",
+    "err.bad_json": "the JSON could not be read",
+    "err.bad_config": "the config is not an object",
+    "err.no_outbound": "no proxy outbound found in the config",
+    "err.unsupported": "unsupported link type (use socks5://, http:// or vless://)",
+    "err.unsupported_transport": "unsupported VLESS transport (use a JSON config for it)",
+    "err.unsupported_security": "unsupported VLESS security",
+    "err.too_long": "the link is too long",
+    "status.err.proxy_failed": "None of the added proxies is working right now. The bot keeps trying them in turn.",
     "err.not_git": "This installation is not a git checkout (or git is missing), so it can't be updated here.",
     "err.fetch_failed": "Couldn't reach GitHub to check for updates.",
     "err.update_running": "An update is already running.",
@@ -259,7 +290,38 @@ const I18N = {
     "privacy.none": "Записей не найдено.",
     "privacy.erase": "Стереть данные",
     "privacy.done": "Данные стёрты в записях: {n}.",
+    "proxy.title": "Прокси",
+    "proxy.hint": "Нужно, если Discord заблокирован у вашего провайдера. Вставьте ссылки на прокси или полный конфиг Xray/V2Ray, по одной ссылке в строке: socks5://user:pass@host:port, http://host:port, vless://… или JSON-конфиг. До {max} записей; бот пробует их по порядку и переключается на следующую, если текущая перестала работать.",
+    "proxy.placeholder": "socks5://127.0.0.1:2080\nhttp://127.0.0.1:10809\nvless://uuid@host:443?type=tcp&security=reality&…\n{ JSON-конфиг }",
+    "proxy.add": "Добавить",
+    "proxy.empty": "Прокси не добавлены. Бот подключается напрямую.",
+    "proxy.count": "{n} / {max}",
+    "proxy.active": "используется",
+    "proxy.ok": "работает",
+    "proxy.failed": "не работает",
+    "proxy.unknown": "ещё не проверялся",
+    "proxy.remove": "Удалить",
+    "proxy.added": "Добавлено: {n}.",
+    "proxy.skipped": "Пропущено: {list}.",
+    "proxy.item": "пункт {n}: {text}",
+    "proxy.xray_downloading": "Загружается ядро Xray (нужно для SOCKS5 и VLESS)…",
+    "proxy.xray_error": "Не удалось загрузить ядро Xray: {detail}. Положите файл xray в data/bin/xray вручную или установите его так, чтобы он был доступен как xray.",
     "err.query_empty": "Введите юзернейм или ID.",
+    "err.proxy_invalid": "Ничего не удалось добавить.",
+    "err.proxy_limit": "Достигнут лимит прокси.",
+    "err.proxy_missing": "Такого прокси уже нет.",
+    "err.empty": "Вставьте хотя бы один прокси.",
+    "err.bad_link": "ссылка повреждена",
+    "err.bad_uuid": "идентификатор VLESS не является корректным UUID",
+    "err.bad_reality": "для REALITY нужен параметр pbk (публичный ключ)",
+    "err.bad_json": "не удалось прочитать JSON",
+    "err.bad_config": "конфиг не является объектом",
+    "err.no_outbound": "в конфиге не найден исходящий прокси",
+    "err.unsupported": "неподдерживаемый тип ссылки (используйте socks5://, http:// или vless://)",
+    "err.unsupported_transport": "неподдерживаемый транспорт VLESS (для него используйте JSON-конфиг)",
+    "err.unsupported_security": "неподдерживаемая защита VLESS",
+    "err.too_long": "ссылка слишком длинная",
+    "status.err.proxy_failed": "Сейчас не работает ни один из добавленных прокси. Бот продолжает пробовать их по очереди.",
     "err.not_git": "Эта установка не является git-копией (или не установлен git), обновить её отсюда нельзя.",
     "err.fetch_failed": "Не удалось связаться с GitHub для проверки обновлений.",
     "err.update_running": "Обновление уже выполняется.",
@@ -915,7 +977,7 @@ function renderDashboard() {
     const current = res.bot.status;
     if (ui.tab === "status") renderStatusTab(content);
     if (ui.tab === "servers" && previousStatus !== null && previousStatus !== current) renderServersTab(content);
-    if (ui.tab === "settings") renderModerator();
+    if (ui.tab === "settings") { renderModerator(); if (proxyRefresh) proxyRefresh(); }
     if (ui.tab === "logs") repaintFeed();
     previousStatus = current;
   });
@@ -1203,6 +1265,80 @@ function privacySection() {
   );
 }
 
+let proxyRefresh = null;
+
+function proxySection() {
+  const text = h("textarea", { class: "proxy-input", spellcheck: "false", placeholder: tr("proxy.placeholder"), maxlength: "400000" });
+  const list = h("div", { class: "proxy-list" });
+  const note = h("div", {});
+  const count = h("span", { class: "meta" });
+  const addButton = h("button", { class: "btn", type: "button" }, tr("proxy.add"));
+
+  function statusOf(row) {
+    if (row.active) return ["online", tr("proxy.active") + (row.status && row.status.ms ? " · " + row.status.ms + " ms" : "")];
+    if (!row.status) return ["", tr("proxy.unknown")];
+    return row.status.ok ? ["online", tr("proxy.ok")] : ["error", tr("proxy.failed")];
+  }
+
+  function paint(data) {
+    count.textContent = tr("proxy.count", { n: data.entries.length, max: data.max });
+    const notes = [];
+    if (data.binary.state === "downloading") notes.push(h("div", { class: "msg info" }, tr("proxy.xray_downloading")));
+    if (data.binary.state === "error") notes.push(h("div", { class: "msg error" }, tr("proxy.xray_error", { detail: data.binary.detail })));
+    note.replaceChildren(...notes);
+    if (!data.entries.length) { list.replaceChildren(h("div", { class: "empty" }, tr("proxy.empty"))); return; }
+    list.replaceChildren(...data.entries.map((row, index) => {
+      const [dot, label] = statusOf(row);
+      return h("div", { class: "proxy-row" },
+        h("span", { class: "proxy-num" }, String(index + 1)),
+        h("span", { class: "badge" }, row.type),
+        h("span", { class: "proxy-label" }, row.label),
+        h("span", { class: "proxy-state" }, h("span", { class: "dot " + dot }), label),
+        h("button", { class: "btn secondary small", type: "button", title: tr("proxy.remove"), onclick: () => remove(row.id) }, "×")
+      );
+    }));
+  }
+
+  async function refresh() {
+    const res = await api("GET", "/api/proxy");
+    if (res.ok) paint(res);
+  }
+
+  async function remove(id) {
+    const res = await api("DELETE", "/api/proxy/" + encodeURIComponent(id), {});
+    if (!res.ok) { toast(errorText(res), "error"); return; }
+    paint(res);
+  }
+
+  addButton.addEventListener("click", async () => {
+    addButton.disabled = true;
+    const res = await api("POST", "/api/proxy", { text: text.value });
+    addButton.disabled = false;
+    const lines = (res.errors || []).map(e => tr("proxy.item", { n: e.n, text: errorText({ error: e.code }) }));
+    if (!res.ok) {
+      note.replaceChildren(h("div", { class: "msg error" }, [errorText(res), ...lines].join("\n")));
+      return;
+    }
+    text.value = "";
+    paint(res);
+    if (lines.length) note.append(h("div", { class: "msg info" }, tr("proxy.added", { n: res.added }) + " " + tr("proxy.skipped", { list: lines.join("; ") })));
+    else toast(tr("proxy.added", { n: res.added }), "ok");
+  });
+
+  proxyRefresh = refresh;
+  refresh();
+
+  return h("div", { class: "section" },
+    h("h3", {}, tr("proxy.title")),
+    h("p", { class: "meta" }, tr("proxy.hint", { max: 100 })),
+    count,
+    note,
+    list,
+    text,
+    h("div", { class: "actions" }, addButton)
+  );
+}
+
 function renderSettingsTab(content) {
   const panelLang = langSelect(me.panel_lang);
   const botLang = langSelect(me.bot_lang);
@@ -1253,7 +1389,8 @@ function renderSettingsTab(content) {
     moderatorSection(),
     h("div", { class: "section" }, h("h3", {}, tr("settings.token")), h("p", { class: "meta" }, tr("settings.token_hint")), tokenForm),
     updateSection(),
-    privacySection()
+    privacySection(),
+    proxySection()
   ));
   renderModerator();
 }
@@ -1267,12 +1404,29 @@ function typingNow() {
   return !!el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable);
 }
 
+const KOS_REMOTE = "https://sun1-13.userapi.com/s/v1/ig2/6ik4I-I0a9zOuDvPmcE45LYfduxHpbV2E2WexX5hHhrxVSPn-iaon8XhyfC0LDViMa0lCd_KDBoi2zKITAiR_RfY.jpg?quality=95&as=32x17,48x25,72x38,108x57,160x85,240x127,360x191,480x255,540x287,640x340,720x382,968x514&from=bu&cs=968x0";
+
+async function loadKosBackground() {
+  let source = KOS_REMOTE;
+  try {
+    const res = await fetch("/api/kos-bg", { method: "HEAD", cache: "no-store" });
+    if (res.ok) source = "/api/kos-bg";
+  } catch (e) {}
+  document.documentElement.style.setProperty("--kos-bg", 'url("' + source + '")');
+}
+
 function toggleKos() {
   const on = document.documentElement.toggleAttribute("data-kos");
   try { localStorage.setItem("mb_kos", on ? "1" : "0"); } catch (e) {}
+  if (on) loadKosBackground();
 }
 
-try { if (localStorage.getItem("mb_kos") === "1") document.documentElement.setAttribute("data-kos", ""); } catch (e) {}
+try {
+  if (localStorage.getItem("mb_kos") === "1") {
+    document.documentElement.setAttribute("data-kos", "");
+    loadKosBackground();
+  }
+} catch (e) {}
 
 document.addEventListener("keydown", (event) => {
   if (event.ctrlKey || event.metaKey || event.altKey || event.repeat || typingNow()) { kosBuffer = []; return; }

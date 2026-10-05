@@ -18,7 +18,7 @@ async def validate_token(token: str) -> tuple[bool, str]:
     try:
         timeout = aiohttp.ClientTimeout(total=15)
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(API_ME, headers={"Authorization": f"Bot {token}"}) as resp:
+            async with session.get(API_ME, headers={"Authorization": f"Bot {token}"}, proxy=state.proxy_url) as resp:
                 if resp.status == 200:
                     return True, ""
                 if resp.status == 401:
@@ -54,35 +54,65 @@ class BotRunner:
 
     async def supervise(self, token: str, stop_event: asyncio.Event):
         delay = 5
+        pool = state.proxies
         while not stop_event.is_set():
-            bot = GuardBot()
+            url = None
+            if pool.entries:
+                url = await pool.connect(stop_event)
+                if url is None:
+                    self.error = "proxy_failed"
+                    if await self.pause(stop_event, delay):
+                        break
+                    delay = min(delay * 2, 60)
+                    continue
+            state.proxy_url = url
+            self.error = ""
+            bot = GuardBot(proxy=url)
             self.bot = bot
+            run = asyncio.create_task(bot.start(token))
+            watch = asyncio.create_task(pool.watch()) if url else None
             try:
-                await bot.start(token)
-                if stop_event.is_set():
-                    break
-            except discord.LoginFailure:
-                self.error = "token_invalid"
-                break
-            except discord.PrivilegedIntentsRequired:
-                self.error = "intents"
-                break
-            except asyncio.CancelledError:
-                raise
-            except Exception as e:
-                logger.error(f"Connection error: {e}")
-                self.error = "network"
+                await asyncio.wait({t for t in (run, watch) if t}, return_when=asyncio.FIRST_COMPLETED)
             finally:
+                if watch and not watch.done():
+                    watch.cancel()
                 if not bot.is_closed():
                     try:
                         await bot.close()
                     except Exception:
                         pass
-            try:
-                await asyncio.wait_for(stop_event.wait(), delay)
-            except asyncio.TimeoutError:
-                delay = min(delay * 2, 60)
+            proxy_died = watch is not None and watch.done() and not watch.cancelled() and not run.done()
+            result = (await asyncio.gather(run, return_exceptions=True))[0]
+            if stop_event.is_set():
+                break
+            if proxy_died:
+                logger.warning("Proxy stopped responding, switching to the next one")
+                await pool.advance()
+                delay = 5
+                continue
+            if isinstance(result, discord.LoginFailure):
+                self.error = "token_invalid"
+                break
+            if isinstance(result, discord.PrivilegedIntentsRequired):
+                self.error = "intents"
+                break
+            if isinstance(result, BaseException):
+                logger.error(f"Connection error: {result}")
+                self.error = "network"
+                if url:
+                    await pool.advance()
+            if await self.pause(stop_event, delay):
+                break
+            delay = min(delay * 2, 60)
+        state.proxy_url = None
         self.running = False
+
+    async def pause(self, stop_event: asyncio.Event, seconds: float) -> bool:
+        try:
+            await asyncio.wait_for(stop_event.wait(), seconds)
+            return True
+        except asyncio.TimeoutError:
+            return False
 
     async def stop(self):
         task, bot, event = self.task, self.bot, self.stop_event
@@ -101,6 +131,7 @@ class BotRunner:
                 await asyncio.gather(task, return_exceptions=True)
         self.bot = None
         self.running = False
+        await state.proxies.stop()
 
     def snapshot(self) -> dict:
         bot = self.bot
@@ -108,7 +139,7 @@ class BotRunner:
         if online:
             status = "online"
             error = ""
-        elif self.running and self.error == "network":
+        elif self.running and self.error in ("network", "proxy_failed"):
             status = "reconnecting"
             error = self.error
         elif self.error:

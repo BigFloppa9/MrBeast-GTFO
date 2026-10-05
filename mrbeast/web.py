@@ -11,7 +11,9 @@ from .config import DEFAULT_REASON, LANGUAGES
 from .logstore import read_image
 from .runner import clean_token, runner, validate_token
 from .security import CODE_TTL, MIN_PASSWORD_LENGTH
+from .proxy import parse_text
 from .state import state
+from .theme import CONTENT_TYPES as BG_TYPES, ensure_background
 from .updater import apply as apply_update, check as check_update
 from .utils import apply_patch, fmt_duration
 
@@ -20,7 +22,7 @@ logger = logging.getLogger("mrbeast.web")
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 COOKIE = "mb_session"
 PUBLIC_API = {
-    "/api/state", "/api/setup", "/api/login",
+    "/api/state", "/api/setup", "/api/login", "/api/kos-bg",
     "/api/forgot/start", "/api/forgot/verify", "/api/forgot/finish",
 }
 CSP = (
@@ -90,10 +92,9 @@ async def index(request: web.Request):
 
 async def static_file(request: web.Request):
     name = request.match_info["name"]
-    path = STATIC_DIR / name
-    if name not in ("app.js", "app.css", "kos.jpg") or not path.is_file():
+    if name not in ("app.js", "app.css"):
         raise web.HTTPNotFound()
-    return web.FileResponse(path, headers={"Cache-Control": "no-cache"})
+    return web.FileResponse(STATIC_DIR / name, headers={"Cache-Control": "no-cache"})
 
 
 async def api_state(request: web.Request):
@@ -367,8 +368,44 @@ async def api_update_status(request: web.Request):
     return ok(**state.update)
 
 
+async def api_kos_bg(request: web.Request):
+    path = await ensure_background()
+    if path is None:
+        raise web.HTTPNotFound()
+    return web.FileResponse(path, headers={"Content-Type": BG_TYPES[path.suffix[1:]], "Cache-Control": "public, max-age=86400"})
+
+
+async def restart_bot():
+    token = state.auth.get_token()
+    if token:
+        await runner.start(token)
+
+
+async def api_proxy_get(request: web.Request):
+    return ok(**state.proxies.view())
+
+
+async def api_proxy_add(request: web.Request):
+    data = await read_body(request)
+    entries, errors = parse_text(str(data.get("text") or ""))
+    if not entries:
+        return fail("proxy_invalid", errors=errors)
+    added = state.proxies.add(entries)
+    if not added:
+        return fail("proxy_limit")
+    await restart_bot()
+    return ok(added=added, errors=errors, **state.proxies.view())
+
+
+async def api_proxy_delete(request: web.Request):
+    if not state.proxies.remove(request.match_info["pid"]):
+        return fail("proxy_missing", 404)
+    await restart_bot()
+    return ok(**state.proxies.view())
+
+
 def create_app() -> web.Application:
-    app = web.Application(middlewares=[guard], client_max_size=1024 * 64)
+    app = web.Application(middlewares=[guard], client_max_size=1024 * 512)
     app.router.add_get("/", index)
     app.router.add_get("/static/{name}", static_file)
     app.router.add_get("/api/state", api_state)
@@ -387,6 +424,10 @@ def create_app() -> web.Application:
     app.router.add_put("/api/token", api_token_put)
     app.router.add_post("/api/moderator/code", api_moderator_code)
     app.router.add_post("/api/privacy/erase", api_erase)
+    app.router.add_get("/api/kos-bg", api_kos_bg)
+    app.router.add_get("/api/proxy", api_proxy_get)
+    app.router.add_post("/api/proxy", api_proxy_add)
+    app.router.add_delete("/api/proxy/{pid}", api_proxy_delete)
     app.router.add_get("/api/update/check", api_update_check)
     app.router.add_post("/api/update/apply", api_update_apply)
     app.router.add_get("/api/update/status", api_update_status)

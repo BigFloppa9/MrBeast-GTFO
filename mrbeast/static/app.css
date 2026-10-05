@@ -181,10 +181,10 @@ html[data-kos] body { background: transparent; }
 html[data-kos] body::before {
   content: "";
   position: fixed;
-  inset: -24px;
+  inset: -16px;
   z-index: -1;
-  background: url("/static/kos.jpg") center / cover no-repeat, url("https://sun1-13.userapi.com/s/v1/ig2/6ik4I-I0a9zOuDvPmcE45LYfduxHpbV2E2WexX5hHhrxVSPn-iaon8XhyfC0LDViMa0lCd_KDBoi2zKITAiR_RfY.jpg?quality=95&as=32x17,48x25,72x38,108x57,160x85,240x127,360x191,480x255,540x287,640x340,720x382,968x514&from=bu&cs=968x0") center / cover no-repeat;
-  filter: blur(4px) brightness(.5) saturate(1.1);
+  background: var(--kos-bg, none) center / cover no-repeat;
+  filter: blur(2px) brightness(.5) saturate(1.1);
 }
 html[data-kos] .auth-card,
 html[data-kos] .side,
@@ -198,3 +198,17 @@ html[data-kos] .thumb:focus-visible,
 html[data-kos] .btn:focus-visible { outline-color: var(--selected); }
 html[data-kos] .btn.secondary { background: rgba(255, 255, 255, .12); }
 html[data-kos] .btn.danger { background: #c4161c; }
+
+.proxy-list { margin: 8px 0 12px; }
+.proxy-row { display: grid; grid-template-columns: 24px auto 1fr auto auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid rgba(255,255,255,.05); }
+.proxy-row:first-child { border-top: 0; }
+.proxy-num { color: var(--muted); font-size: 13px; text-align: right; }
+.badge { background: var(--bg-deep); color: var(--text-strong); font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 10px; text-transform: lowercase; }
+.proxy-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-strong); }
+.proxy-state { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; white-space: nowrap; }
+.proxy-input { min-height: 120px; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 13px; margin-bottom: 8px; }
+.msg { white-space: pre-line; }
+@media (max-width: 760px) {
+  .proxy-row { grid-template-columns: 20px auto 1fr auto; }
+  .proxy-state { grid-column: 2 / 4; }
+}

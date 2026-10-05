@@ -57,7 +57,7 @@ def image_urls(message: discord.Message) -> list[str]:
 
 async def fetch_bytes(session: aiohttp.ClientSession, url: str) -> bytes | None:
     try:
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=15), proxy=state.proxy_url) as resp:
             if resp.status != 200:
                 return None
             buf = bytearray()
@@ -438,7 +438,7 @@ class Guard(commands.Cog):
 
 
 class GuardBot(commands.Bot):
-    def __init__(self):
+    def __init__(self, proxy: str | None = None):
         intents = discord.Intents.default()
         intents.message_content = True
         intents.members = True
@@ -447,6 +447,7 @@ class GuardBot(commands.Bot):
             intents=intents,
             help_command=None,
             tree_cls=GuardTree,
+            proxy=proxy,
         )
         self.ready_at: float | None = None
 

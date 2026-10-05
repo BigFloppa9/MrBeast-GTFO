@@ -22,7 +22,7 @@ Incident records are kept for at most 30 days and never more than the latest 300
 
 The bot also stores per-server settings (timeout reason and length, delete period, log channel ID, detection thresholds), the chosen languages and, optionally, the ID and name of the Discord account linked as the control-panel moderator.
 
-Incident records and saved images are encrypted at rest (Fernet: AES-128-CBC with HMAC-SHA256 authentication) with a key stored on the same device. The bot token is encrypted the same way, and the control-panel password is stored only as a salted PBKDF2 hash.
+Incident records and saved images are encrypted at rest (Fernet: AES-128-CBC with HMAC-SHA256 authentication) with a key stored on the same device. The bot token and the optional proxy list are encrypted the same way, and the control-panel password is stored only as a salted PBKDF2 hash.
 
 ## 3. Where the data is stored
 

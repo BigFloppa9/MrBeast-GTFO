@@ -145,7 +145,7 @@ For the bot to grant itself access to the log channel, additionally give it **Ma
 | **Logs** | Latest records as Discord-style messages: offender display name, username and ID, trigger text, channel link, images (identical ones stored once), action. Updates automatically |
 | **Status** | Bot state, ping, uptime, server list |
 | **Servers** | Per server: timeout reason, duration, delete period, log channel, auto-detection thresholds |
-| **Settings** | Languages, administrator account link, token replacement, updates, removal of a user's data |
+| **Settings** | Languages, administrator account link, token replacement, updates, removal of a user's data, proxy |
 
 In the panel logs, offender fields, trigger text and channel names are cut to 69 characters so spam can't bloat the history. Videos are not saved. Records are kept for at most 30 days (and at most 300 records).
 
@@ -163,6 +163,23 @@ If the password is lost:
 3. Enter the code in the browser, then enter the new password twice.
 
 If no account was linked, stop the panel, delete `data/auth.json` and start the bot again: the setup runs from scratch.
+
+<h3 align="center">Proxy (if Discord is blocked)</h3>
+
+In **Settings → Proxy** you can add up to 100 entries. The bot tries them in order; if the current one stops responding or the connection fails, it automatically switches to the next one. With no entries the bot connects directly.
+
+Accepted (one link per line, or one or several configs in a row):
+
+| Format | Example |
+|---|---|
+| SOCKS5 | `socks5://user:pass@host:1080` |
+| HTTP | `http://host:3128` |
+| VLESS (link) | `vless://uuid@host:443?type=tcp&security=reality&pbk=…&sid=…&flow=xtls-rprx-vision#name` |
+| Xray / V2Ray config (JSON) | a full config from an app, for example a v2rayNG export |
+
+VLESS links support the `tcp`, `ws`, `grpc`, `httpupgrade` and `xhttp` transports and `none`, `tls`, `reality` security. For a JSON config the outbound proxy is taken (the one tagged `proxy`, or the first suitable one); other Xray protocols in such a config work too.
+
+For SOCKS5, VLESS and configs the bot uses the **Xray** core. It is downloaded automatically from GitHub on first use (with a checksum check) to `data/bin/xray`. If GitHub is unavailable, put the `xray` file into that folder manually. Entries are stored in `data/proxies.json` in encrypted form.
 
 <h3 align="center">Updating from the panel</h3>
 
@@ -200,6 +217,8 @@ Everything lives in the `data/` folder (excluded from git):
 | `secret.key` | the encryption key |
 | `settings.json` | per-server settings |
 | `config.json` | languages and the linked administrator account |
+| `proxies.json` | the proxy list in encrypted form |
+| `bin/xray`, `xray/` | the Xray core and its temporary config (appear when a proxy is used) |
 | `logs.json`, `images/` | logs (kept up to 30 days, max 300) and the image cache, both encrypted |
 
 The token, logs and images are encrypted (Fernet) and the key sits in a separate file next to them, so the bot can start by itself after a restart. This protects against leaking a single file by accident, but not against someone who gets the whole `data/` folder. Do not publish it or share it. Details: [privacy policy](PRIVACY.md).
@@ -216,7 +235,7 @@ The token, logs and images are encrypted (Fernet) and the key sits in a separate
 
 | Problem | Solution |
 |---|---|
-| The panel says Discord can't be reached | Discord may be blocked by your provider: use a VPN or proxy on the device. The bot keeps retrying |
+| The panel says Discord can't be reached | Discord may be blocked by your provider: add a proxy in **Settings → Proxy** or turn on a VPN on the device. The bot keeps retrying |
 | "Discord rejected this token" | The token was copied partially or has been reset. Get a new one in the Developer Portal and replace it in Settings |
 | The panel mentions Intents | Enable **Server Members Intent** and **Message Content Intent**, then restart the bot |
 | Slash commands are not visible | Wait a few minutes and restart Discord. The bot must be added with the `applications.commands` scope |
