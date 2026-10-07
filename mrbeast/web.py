@@ -11,7 +11,9 @@ from .config import DEFAULT_REASON, LANGUAGES
 from .logstore import read_image
 from .runner import clean_token, runner, validate_token
 from .security import CODE_TTL, MIN_PASSWORD_LENGTH
-from .proxy import parse_text
+from .images import cached_image
+from .network import lan_addresses
+from .proxy import fetch_subscription, parse_subscription, parse_text
 from .state import state
 from .theme import CONTENT_TYPES as BG_TYPES, ensure_background
 from .updater import apply as apply_update, check as check_update
@@ -27,7 +29,7 @@ PUBLIC_API = {
 }
 CSP = (
     "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
-    "img-src 'self' data: https://cdn.discordapp.com https://media.discordapp.net https://sun1-13.userapi.com; "
+    "img-src 'self' data: https://sun1-13.userapi.com; "
     "base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 )
 CONTENT_TYPES = {"png": "image/png", "jpg": "image/jpeg", "gif": "image/gif", "webp": "image/webp"}
@@ -208,6 +210,8 @@ async def api_status(request: web.Request):
             "id": str(state.config.moderator_id) if state.config.moderator_id else "",
         },
         reg={"active": state.reg_code.active(), "remaining": state.reg_code.remaining()},
+        network={"port": state.port, "addresses": lan_addresses()},
+        bot_state=state.config.bot_state,
         token_ready=state.auth.get_token() is not None,
     )
 
@@ -381,6 +385,78 @@ async def restart_bot():
         await runner.start(token)
 
 
+async def api_img(request: web.Request):
+    kind = request.match_info["kind"]
+    url = runner.image_url(kind, request.match_info.get("gid", ""))
+    path = await cached_image(url) if url else None
+    if path is None:
+        raise web.HTTPNotFound()
+    return web.FileResponse(path, headers={"Content-Type": BG_TYPES[path.suffix[1:]], "Cache-Control": "private, max-age=3600"})
+
+
+async def api_bot(request: web.Request):
+    action = request.match_info["action"]
+    config = state.config
+    if action == "pause":
+        config.set_bot_state("paused")
+    elif action == "resume":
+        config.set_bot_state("running")
+    elif action == "stop":
+        config.set_bot_state("stopped")
+        await runner.stop()
+    elif action in ("start", "restart"):
+        if config.bot_state == "stopped":
+            config.set_bot_state("running")
+        await restart_bot()
+    else:
+        raise web.HTTPNotFound()
+    return ok(bot=runner.snapshot(), bot_state=config.bot_state)
+
+
+async def read_subscription(url: str):
+    if not url.lower().startswith(("http://", "https://")) or len(url) > 2000:
+        return None, fail("sub_invalid")
+    try:
+        body = await fetch_subscription(url, state.proxy_url)
+    except RuntimeError as e:
+        return None, fail("sub_fetch_failed", detail=str(e))
+    entries, skipped = parse_subscription(body)
+    if not entries:
+        return None, fail("sub_empty", skipped=skipped)
+    return (entries, skipped), None
+
+
+async def api_sub_add(request: web.Request):
+    url = str((await read_body(request)).get("url") or "").strip()
+    parsed, error = await read_subscription(url)
+    if error:
+        return error
+    entries, skipped = parsed
+    state.proxies.set_subscription(url, entries)
+    await restart_bot()
+    return ok(skipped=skipped, **state.proxies.view())
+
+
+async def api_sub_update(request: web.Request):
+    sub = next((s for s in state.proxies.subs if s["id"] == request.match_info["sid"]), None)
+    if sub is None:
+        return fail("proxy_missing", 404)
+    parsed, error = await read_subscription(sub["url"])
+    if error:
+        return error
+    entries, skipped = parsed
+    state.proxies.set_subscription(sub["url"], entries, sub["id"])
+    await restart_bot()
+    return ok(skipped=skipped, **state.proxies.view())
+
+
+async def api_sub_delete(request: web.Request):
+    if not state.proxies.remove_subscription(request.match_info["sid"]):
+        return fail("proxy_missing", 404)
+    await restart_bot()
+    return ok(**state.proxies.view())
+
+
 async def api_proxy_get(request: web.Request):
     return ok(**state.proxies.view())
 
@@ -425,6 +501,12 @@ def create_app() -> web.Application:
     app.router.add_post("/api/moderator/code", api_moderator_code)
     app.router.add_post("/api/privacy/erase", api_erase)
     app.router.add_get("/api/kos-bg", api_kos_bg)
+    app.router.add_get("/api/img/{kind}", api_img)
+    app.router.add_get("/api/img/{kind}/{gid}", api_img)
+    app.router.add_post("/api/bot/{action}", api_bot)
+    app.router.add_post("/api/proxy/sub", api_sub_add)
+    app.router.add_post("/api/proxy/sub/{sid}/update", api_sub_update)
+    app.router.add_delete("/api/proxy/sub/{sid}", api_sub_delete)
     app.router.add_get("/api/proxy", api_proxy_get)
     app.router.add_post("/api/proxy", api_proxy_add)
     app.router.add_delete("/api/proxy/{pid}", api_proxy_delete)

@@ -2,12 +2,12 @@ import asyncio
 import logging
 import os
 import signal
-import socket
 import sys
 
 from aiohttp import web
 
 from .config import BASE_DIR
+from .network import lan_addresses
 from .state import state
 from .runner import runner
 from .web import create_app
@@ -15,8 +15,10 @@ from .web import create_app
 BANNER = {
     "en": {
         "title": "MrBeast GTFO panel is running",
-        "network": "Open from any device in your network:",
+        "network": "Open from another device in the same Wi-Fi network (use the address that matches your network):",
         "local": "Open on this device:",
+        "changed": "Network address changed, use:",
+        "hint": "If another device can't open the page, check the phone's IP in the router or Wi-Fi settings and make sure client isolation is off.",
         "setup": "First launch: finish the setup in the browser.",
         "login": "Sign in with your panel password.",
         "stop": "Press Ctrl+C to stop.",
@@ -24,28 +26,16 @@ BANNER = {
     },
     "ru": {
         "title": "Панель MrBeast GTFO запущена",
-        "network": "Откройте с любого устройства в вашей сети:",
+        "network": "Откройте с другого устройства в той же Wi-Fi сети (берите адрес, подходящий вашей сети):",
         "local": "Откройте на этом устройстве:",
+        "changed": "Сетевой адрес изменился, используйте:",
+        "hint": "Если другое устройство не открывает страницу, сверьте IP телефона в роутере или настройках Wi-Fi и убедитесь, что изоляция клиентов выключена.",
         "setup": "Первый запуск: завершите настройку в браузере.",
         "login": "Войдите с паролем от панели.",
         "stop": "Для остановки нажмите Ctrl+C.",
         "no_port": "Не найден свободный порт в диапазоне {first}-{last}.",
     },
 }
-
-
-def local_ip() -> str:
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        sock.connect(("10.255.255.255", 1))
-        return sock.getsockname()[0]
-    except OSError:
-        try:
-            return socket.gethostbyname(socket.gethostname())
-        except OSError:
-            return "127.0.0.1"
-    finally:
-        sock.close()
 
 
 async def bind(site_runner: web.AppRunner, host: str, first: int, attempts: int = 100) -> int | None:
@@ -61,13 +51,15 @@ async def bind(site_runner: web.AppRunner, host: str, first: int, attempts: int 
 
 def print_banner(port: int):
     text = BANNER[state.config.panel_lang]
-    ip = local_ip()
     line = "─" * 52
     print(line)
     print(f" {text['title']}")
     print(line)
     print(f" {text['network']}")
-    print(f"   http://{ip}:{port}")
+    for item in lan_addresses() or [{"ip": "?", "iface": "", "kind": ""}]:
+        tag = f"  [{item['iface']}]" if item["iface"] else ""
+        print(f"   http://{item['ip']}:{port}{tag}")
+    print(f" {text['hint']}")
     print(f" {text['local']}")
     print(f"   http://localhost:{port}")
     print(line)
@@ -76,9 +68,37 @@ def print_banner(port: int):
     print(line, flush=True)
 
 
+class QuietReconnects(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.name == "asyncio" and str(record.msg).startswith("Unclosed connection"):
+            return False
+        if record.name == "discord.client" and str(record.msg).startswith("Attempting a reconnect"):
+            record.levelno, record.levelname, record.exc_info = logging.WARNING, "WARNING", None
+        return True
+
+
+async def watch_network(port: int, stop: asyncio.Event):
+    known = {item["ip"] for item in lan_addresses()}
+    text = BANNER[state.config.panel_lang]
+    while not stop.is_set():
+        try:
+            await asyncio.wait_for(stop.wait(), 30)
+        except asyncio.TimeoutError:
+            current = lan_addresses()
+            ips = {item["ip"] for item in current}
+            if ips != known and ips:
+                known = ips
+                print(f"\n {text['changed']}")
+                for item in current:
+                    print(f"   http://{item['ip']}:{port}")
+
+
 async def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     logging.getLogger("aiohttp.access").setLevel(logging.WARNING)
+    quiet = QuietReconnects()
+    for handler in logging.getLogger().handlers:
+        handler.addFilter(quiet)
 
     host = os.environ.get("MRBEAST_HOST", "0.0.0.0")
     try:
@@ -97,13 +117,14 @@ async def main():
     state.port = port
     print_banner(port)
 
-    if state.auth.configured:
+    if state.auth.configured and state.config.bot_state != "stopped":
         token = state.auth.get_token()
         if token:
             await runner.start(token)
 
     stop = asyncio.Event()
     state.stop_event = stop
+    background = [asyncio.create_task(watch_network(port, stop)), asyncio.create_task(state.proxies.maintain(stop))]
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
@@ -113,6 +134,8 @@ async def main():
     try:
         await stop.wait()
     finally:
+        for task in background:
+            task.cancel()
         await runner.stop()
         await site_runner.cleanup()
 

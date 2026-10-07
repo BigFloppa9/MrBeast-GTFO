@@ -17,6 +17,7 @@ LOGS_FILE = DATA_DIR / "logs.json"
 PROXIES_FILE = DATA_DIR / "proxies.json"
 BIN_DIR = DATA_DIR / "bin"
 XRAY_DIR = DATA_DIR / "xray"
+CACHE_DIR = DATA_DIR / "cache"
 
 MAX_TIMEOUT_MINUTES = 28 * 1440
 MAX_DELETE_WINDOW_MINUTES = 365 * 1440
@@ -55,13 +56,15 @@ DEFAULT_CONFIG = {
     "panel_lang": "en",
     "moderator_id": 0,
     "moderator_name": "",
+    "bot_state": "running",
 }
 
 
 def ensure_dirs():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-    for path in (DATA_DIR, IMAGES_DIR):
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    for path in (DATA_DIR, IMAGES_DIR, CACHE_DIR):
         try:
             os.chmod(path, 0o700)
         except OSError:
@@ -152,6 +155,8 @@ class GlobalConfig:
         for key in ("bot_lang", "panel_lang"):
             if self.data[key] not in LANGUAGES:
                 self.data[key] = "en"
+        if self.data["bot_state"] not in ("running", "paused", "stopped"):
+            self.data["bot_state"] = "running"
 
     @property
     def bot_lang(self) -> str:
@@ -160,6 +165,14 @@ class GlobalConfig:
     @property
     def panel_lang(self) -> str:
         return self.data["panel_lang"]
+
+    @property
+    def bot_state(self) -> str:
+        return self.data["bot_state"]
+
+    def set_bot_state(self, value: str):
+        self.data["bot_state"] = value
+        self.save()
 
     @property
     def moderator_id(self) -> int:

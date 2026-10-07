@@ -83,9 +83,11 @@ else
   echo "PYTHON_BIN=$DIR/.venv/bin/python" > .runtime
 fi
 
+REL="${DIR#"$HOME"/}"
+[ "$REL" = "$DIR" ] || DISPLAY_DIR="$REL"
 echo
-echo "Installed in: $DIR"
-echo "Starting. Next time use: cd \"$DIR\" && bash start.sh"
+echo "Installed in: ${DISPLAY_DIR:-$DIR}"
+echo "Starting. Next time use: cd ${DISPLAY_DIR:-$DIR} && bash start.sh"
 echo
 
 exec bash "$DIR/start.sh"

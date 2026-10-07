@@ -94,8 +94,30 @@ const I18N = {
     "privacy.none": "No records found.",
     "privacy.erase": "Erase data",
     "privacy.done": "Data erased in {n} record(s).",
+    "state.paused": "Paused",
+    "bot.pause": "Pause",
+    "bot.resume": "Resume",
+    "bot.restart": "Restart",
+    "bot.stop": "Stop",
+    "bot.start": "Start",
+    "bot.controls": "Bot control",
+    "bot.paused_hint": "While paused, the bot does not react to image spam. Manual commands still work.",
+    "net.title": "Panel addresses",
+    "net.hint": "Open the address that matches the network of your other device. If it doesn't open, check the phone's IP in the router and that client isolation is off.",
+    "net.wifi": "Wi-Fi",
+    "net.vpn": "VPN",
+    "net.mobile": "mobile data",
+    "net.other": "other",
+    "proxy.sub_title": "Subscription",
+    "proxy.sub_hint": "Paste a subscription link: the bot reads the servers from it and adds them. Update it when the provider changes the list.",
+    "proxy.sub_add": "Add subscription",
+    "proxy.sub_update": "Update",
+    "proxy.sub_count": "{n} servers",
+    "proxy.sub_added": "Subscription added: {n} servers.",
+    "proxy.sub_updated": "Subscription updated: {n} servers.",
+    "proxy.sub_placeholder": "https://example.com/sub/…",
     "proxy.title": "Proxy",
-    "proxy.hint": "Use this if Discord is blocked at your provider. Paste proxy links or a full Xray/V2Ray config, one link per line: socks5://user:pass@host:port, http://host:port, vless://… or a JSON config. Up to {max} entries; the bot tries them in order and switches to the next one if the current one stops working.",
+    "proxy.hint": "Use this if Discord is blocked at your provider. Paste proxy links or a full Xray/V2Ray config, one link per line: socks5://user:pass@host:port, http://host:port, vless://… or a JSON config. Up to {max} entries. The bot checks them all, connects to the fastest one and re-selects when it fails or gets slower than 1000 ms; if none works, it connects directly. Servers that stay offline for over a day are removed.",
     "proxy.placeholder": "socks5://127.0.0.1:2080\nhttp://127.0.0.1:10809\nvless://uuid@host:443?type=tcp&security=reality&…\n{ JSON config }",
     "proxy.add": "Add",
     "proxy.empty": "No proxies added. The bot connects directly.",
@@ -125,7 +147,10 @@ const I18N = {
     "err.unsupported_transport": "unsupported VLESS transport (use a JSON config for it)",
     "err.unsupported_security": "unsupported VLESS security",
     "err.too_long": "the link is too long",
-    "status.err.proxy_failed": "None of the added proxies is working right now. The bot keeps trying them in turn.",
+    "status.err.proxy_failed": "None of the added proxies is working right now, so the bot connects directly. Proxies are re-checked in the background.",
+    "err.sub_invalid": "Enter a link starting with http:// or https://.",
+    "err.sub_fetch_failed": "Couldn't download the subscription.",
+    "err.sub_empty": "No supported servers found in the subscription.",
     "err.not_git": "This installation is not a git checkout (or git is missing), so it can't be updated here.",
     "err.fetch_failed": "Couldn't reach GitHub to check for updates.",
     "err.update_running": "An update is already running.",
@@ -290,8 +315,30 @@ const I18N = {
     "privacy.none": "Записей не найдено.",
     "privacy.erase": "Стереть данные",
     "privacy.done": "Данные стёрты в записях: {n}.",
+    "state.paused": "Пауза",
+    "bot.pause": "Пауза",
+    "bot.resume": "Включить",
+    "bot.restart": "Перезагрузить",
+    "bot.stop": "Остановить",
+    "bot.start": "Запустить",
+    "bot.controls": "Управление ботом",
+    "bot.paused_hint": "Во время паузы бот не реагирует на спам картинками. Ручные команды продолжают работать.",
+    "net.title": "Адреса панели",
+    "net.hint": "Откройте адрес из той же сети, в которой находится ваше второе устройство. Если страница не открывается, сверьте IP телефона в роутере и проверьте, что изоляция клиентов выключена.",
+    "net.wifi": "Wi-Fi",
+    "net.vpn": "VPN",
+    "net.mobile": "мобильная сеть",
+    "net.other": "другое",
+    "proxy.sub_title": "Подписка",
+    "proxy.sub_hint": "Вставьте ссылку на подписку: бот прочитает из неё серверы и добавит их. Обновляйте, когда провайдер меняет список.",
+    "proxy.sub_add": "Добавить подписку",
+    "proxy.sub_update": "Обновить",
+    "proxy.sub_count": "Серверов: {n}",
+    "proxy.sub_added": "Подписка добавлена: серверов {n}.",
+    "proxy.sub_updated": "Подписка обновлена: серверов {n}.",
+    "proxy.sub_placeholder": "https://example.com/sub/…",
     "proxy.title": "Прокси",
-    "proxy.hint": "Нужно, если Discord заблокирован у вашего провайдера. Вставьте ссылки на прокси или полный конфиг Xray/V2Ray, по одной ссылке в строке: socks5://user:pass@host:port, http://host:port, vless://… или JSON-конфиг. До {max} записей; бот пробует их по порядку и переключается на следующую, если текущая перестала работать.",
+    "proxy.hint": "Нужно, если Discord заблокирован у вашего провайдера. Вставьте ссылки на прокси или полный конфиг Xray/V2Ray, по одной ссылке в строке: socks5://user:pass@host:port, http://host:port, vless://… или JSON-конфиг. До {max} записей. Бот проверяет все, подключается к самой быстрой и выбирает заново, если она отказала или стала медленнее 1000 мс; если не работает ни одна, подключается напрямую. Серверы, которые не отвечают больше суток, удаляются.",
     "proxy.placeholder": "socks5://127.0.0.1:2080\nhttp://127.0.0.1:10809\nvless://uuid@host:443?type=tcp&security=reality&…\n{ JSON-конфиг }",
     "proxy.add": "Добавить",
     "proxy.empty": "Прокси не добавлены. Бот подключается напрямую.",
@@ -321,7 +368,10 @@ const I18N = {
     "err.unsupported_transport": "неподдерживаемый транспорт VLESS (для него используйте JSON-конфиг)",
     "err.unsupported_security": "неподдерживаемая защита VLESS",
     "err.too_long": "ссылка слишком длинная",
-    "status.err.proxy_failed": "Сейчас не работает ни один из добавленных прокси. Бот продолжает пробовать их по очереди.",
+    "status.err.proxy_failed": "Сейчас не работает ни один из добавленных прокси, поэтому бот подключается напрямую. Прокси перепроверяются в фоне.",
+    "err.sub_invalid": "Введите ссылку, начинающуюся с http:// или https://.",
+    "err.sub_fetch_failed": "Не удалось загрузить подписку.",
+    "err.sub_empty": "В подписке не найдено поддерживаемых серверов.",
     "err.not_git": "Эта установка не является git-копией (или не установлен git), обновить её отсюда нельзя.",
     "err.fetch_failed": "Не удалось связаться с GitHub для проверки обновлений.",
     "err.update_running": "Обновление уже выполняется.",
@@ -908,7 +958,7 @@ async function enterDashboard() {
 function stateDotClass(status) {
   if (status === "online") return "dot online";
   if (status === "error") return "dot error";
-  if (status === "starting" || status === "reconnecting") return "dot wait";
+  if (status === "starting" || status === "reconnecting" || status === "paused") return "dot wait";
   return "dot";
 }
 
@@ -919,7 +969,7 @@ function renderDashboard() {
   const content = h("div", { class: "content", id: "content" });
   const banner = h("div", { class: "msg error banner", hidden: true, role: "alert" });
   const title = h("div", {});
-  const pill = h("div", { class: "pill", id: "pill" });
+  const pill = h("div", { class: "pill top", id: "pill" });
   const nav = h("div", { class: "nav" });
   const brand = h("div", { class: "brand" }, h("div", { class: "avatar fallback", id: "brand-avatar" }, "M"), h("span", {}, "MrBeast GTFO"));
 
@@ -935,6 +985,7 @@ function renderDashboard() {
   function paintPill() {
     const status = statusData && statusData.ok ? statusData.bot.status : "stopped";
     pill.replaceChildren(h("span", { class: stateDotClass(status) }), h("span", { class: "label" }, tr("state." + status)));
+    if (status === "paused") pill.firstChild.className = "dot wait";
     const problem = statusData && statusData.ok ? statusData.bot.error : "";
     banner.textContent = problem ? tr("status.err." + problem) : "";
     banner.hidden = !problem;
@@ -942,6 +993,8 @@ function renderDashboard() {
     const holder = document.getElementById("brand-avatar");
     if (holder && bot) holder.replaceWith(Object.assign(avatarNode(bot), { id: "brand-avatar" }));
   }
+
+  paintPillFn = paintPill;
 
   function paintTab() {
     if (ui.tab === "logs") renderLogsTab(content);
@@ -956,9 +1009,9 @@ function renderDashboard() {
   }, icon("logout"), h("span", { class: "label" }, tr("nav.logout")));
 
   mount(h("div", { class: "shell" },
-    h("aside", { class: "side" }, brand, nav, h("div", { class: "side-foot" }, pill)),
+    h("aside", { class: "side" }, brand, nav),
     h("section", { class: "main" },
-      h("header", { class: "topbar" }, title, logout),
+      h("header", { class: "topbar" }, h("div", { class: "top-left" }, title, pill), logout),
       banner,
       content
     )
@@ -976,7 +1029,7 @@ function renderDashboard() {
     paintPill();
     const current = res.bot.status;
     if (ui.tab === "status") renderStatusTab(content);
-    if (ui.tab === "servers" && previousStatus !== null && previousStatus !== current) renderServersTab(content);
+    if (ui.tab === "servers" && previousStatus !== null && previousStatus !== current && (previousStatus === "stopped" || current === "stopped")) renderServersTab(content);
     if (ui.tab === "settings") { renderModerator(); if (proxyRefresh) proxyRefresh(); }
     if (ui.tab === "logs") repaintFeed();
     previousStatus = current;
@@ -1032,6 +1085,17 @@ function stat(label, value) {
   return h("div", { class: "stat" }, h("b", {}, value), h("span", {}, label));
 }
 
+let paintPillFn = null;
+
+async function botAction(action, content) {
+  const res = await api("POST", "/api/bot/" + action, {});
+  if (!res.ok) { toast(errorText(res), "error"); return; }
+  const status = await api("GET", "/api/status");
+  if (status.ok) statusData = status;
+  if (paintPillFn) paintPillFn();
+  renderStatusTab(content);
+}
+
 function renderStatusTab(content) {
   if (!statusData || !statusData.ok) { content.replaceChildren(h("div", { class: "empty" }, "…")); return; }
   const bot = statusData.bot;
@@ -1048,38 +1112,63 @@ function renderStatusTab(content) {
     stat(tr("stat.uptime"), fmtUptime(bot.uptime)),
     stat(tr("stat.servers"), String(bot.guilds.length))
   ));
-  const list = h("div", { class: "section" }, h("h3", {}, tr("status.servers")));
-  if (!bot.guilds.length) list.append(h("div", { class: "empty" }, tr("status.no_servers")));
-  for (const guild of bot.guilds) {
-    const icon = guild.icon
-      ? h("img", { class: "avatar", src: guild.icon, alt: "" })
-      : h("div", { class: "avatar fallback" }, guild.name.charAt(0).toUpperCase());
-    list.append(h("div", { class: "guild" }, icon,
-      h("div", {}, h("div", { class: "name" }, guild.name), h("div", { class: "meta" }, tr("status.members", { n: guild.members ?? "?" })))));
+  const stopped = statusData.bot_state === "stopped";
+  const paused = statusData.bot_state === "paused";
+  const buttons = stopped
+    ? [h("button", { class: "btn", type: "button", onclick: () => botAction("start", content) }, tr("bot.start"))]
+    : [
+        h("button", { class: "btn secondary", type: "button", onclick: () => botAction(paused ? "resume" : "pause", content) }, tr(paused ? "bot.resume" : "bot.pause")),
+        h("button", { class: "btn secondary", type: "button", onclick: () => botAction("restart", content) }, tr("bot.restart")),
+        h("button", { class: "btn danger", type: "button", onclick: () => botAction("stop", content) }, tr("bot.stop"))
+      ];
+  nodes.push(h("div", { class: "section" }, h("h3", {}, tr("bot.controls")),
+    paused ? h("p", { class: "meta" }, tr("bot.paused_hint")) : null,
+    h("div", { class: "actions" }, buttons)));
+  const net = statusData.network;
+  if (net && net.addresses.length) {
+    nodes.push(h("div", { class: "section" }, h("h3", {}, tr("net.title")),
+      h("p", { class: "meta" }, tr("net.hint")),
+      net.addresses.map(item => h("div", { class: "addr" },
+        h("a", { href: "http://" + item.ip + ":" + net.port }, "http://" + item.ip + ":" + net.port),
+        h("span", { class: "meta" }, tr("net." + item.kind) + (item.iface ? " · " + item.iface : ""))))));
   }
-  nodes.push(list);
   content.replaceChildren(h("div", { class: "panel" }, nodes));
+}
+
+function guildIcon(guild) {
+  const fallback = () => h("div", { class: "avatar fallback" }, guild.name.charAt(0).toUpperCase());
+  if (!guild.icon) return fallback();
+  const img = h("img", { class: "avatar", src: guild.icon, alt: "" });
+  img.addEventListener("error", () => img.replaceWith(fallback()));
+  return img;
 }
 
 function renderServersTab(content) {
   const bot = statusData && statusData.ok ? statusData.bot : null;
-  if (!bot || bot.status !== "online") {
+  if (!bot || bot.status === "stopped" || !bot.user) {
     content.replaceChildren(h("div", { class: "panel" }, h("div", { class: "msg info" }, tr("servers.offline"))));
     return;
   }
   if (!bot.guilds.length) {
-    content.replaceChildren(h("div", { class: "panel" }, h("div", { class: "empty" }, tr("servers.none"))));
+    content.replaceChildren(h("div", { class: "panel" }, h("div", { class: "empty" }, tr("status.no_servers"))));
     return;
   }
-  const select = h("select", {}, bot.guilds.map(g => h("option", { value: g.id }, g.name)));
+  if (!ui.guild || !bot.guilds.some(g => g.id === ui.guild)) ui.guild = bot.guilds[0].id;
   const body = h("div", {});
-  if (ui.guild && bot.guilds.some(g => g.id === ui.guild)) select.value = ui.guild;
-  else ui.guild = select.value;
-  select.addEventListener("change", () => { ui.guild = select.value; loadGuild(body, ui.guild); });
-  content.replaceChildren(h("div", { class: "panel" },
-    h("div", { class: "section" }, field(tr("servers.pick"), select)),
-    body
-  ));
+  const list = h("div", { class: "section" }, h("h3", {}, tr("status.servers")));
+  const rows = bot.guilds.map(guild => {
+    const row = h("button", { class: "guild pick" + (guild.id === ui.guild ? " selected" : ""), type: "button" },
+      guildIcon(guild),
+      h("div", {}, h("div", { class: "name" }, guild.name), h("div", { class: "meta" }, tr("status.members", { n: guild.members ?? "?" }))));
+    row.addEventListener("click", () => {
+      ui.guild = guild.id;
+      rows.forEach(r => r.classList.toggle("selected", r === row));
+      loadGuild(body, ui.guild);
+    });
+    return row;
+  });
+  list.append(...rows);
+  content.replaceChildren(h("div", { class: "panel" }, list, body));
   loadGuild(body, ui.guild);
 }
 
@@ -1273,6 +1362,9 @@ function proxySection() {
   const note = h("div", {});
   const count = h("span", { class: "meta" });
   const addButton = h("button", { class: "btn", type: "button" }, tr("proxy.add"));
+  const subs = h("div", { class: "proxy-list" });
+  const subInput = h("input", { type: "text", autocomplete: "off", spellcheck: "false", placeholder: tr("proxy.sub_placeholder") });
+  const subButton = h("button", { class: "btn secondary", type: "button" }, tr("proxy.sub_add"));
 
   function statusOf(row) {
     if (row.active) return ["online", tr("proxy.active") + (row.status && row.status.ms ? " · " + row.status.ms + " ms" : "")];
@@ -1286,6 +1378,12 @@ function proxySection() {
     if (data.binary.state === "downloading") notes.push(h("div", { class: "msg info" }, tr("proxy.xray_downloading")));
     if (data.binary.state === "error") notes.push(h("div", { class: "msg error" }, tr("proxy.xray_error", { detail: data.binary.detail })));
     note.replaceChildren(...notes);
+    subs.replaceChildren(...data.subs.map(sub => h("div", { class: "proxy-row sub" },
+      h("span", { class: "badge" }, "sub"),
+      h("span", { class: "proxy-label" }, sub.label),
+      h("span", { class: "proxy-state" }, tr("proxy.sub_count", { n: sub.count })),
+      h("button", { class: "btn secondary small", type: "button", onclick: () => updateSub(sub.id) }, tr("proxy.sub_update")),
+      h("button", { class: "btn secondary small", type: "button", title: tr("proxy.remove"), onclick: () => removeSub(sub.id) }, "×"))));
     if (!data.entries.length) { list.replaceChildren(h("div", { class: "empty" }, tr("proxy.empty"))); return; }
     list.replaceChildren(...data.entries.map((row, index) => {
       const [dot, label] = statusOf(row);
@@ -1309,6 +1407,29 @@ function proxySection() {
     if (!res.ok) { toast(errorText(res), "error"); return; }
     paint(res);
   }
+
+  async function updateSub(id) {
+    const res = await api("POST", "/api/proxy/sub/" + encodeURIComponent(id) + "/update", {});
+    if (!res.ok) { toast(errorText(res), "error"); return; }
+    paint(res);
+    toast(tr("proxy.sub_updated", { n: res.subs.find(s => s.id === id)?.count ?? 0 }), "ok");
+  }
+
+  async function removeSub(id) {
+    const res = await api("DELETE", "/api/proxy/sub/" + encodeURIComponent(id), {});
+    if (!res.ok) { toast(errorText(res), "error"); return; }
+    paint(res);
+  }
+
+  subButton.addEventListener("click", async () => {
+    subButton.disabled = true;
+    const res = await api("POST", "/api/proxy/sub", { url: subInput.value.trim() });
+    subButton.disabled = false;
+    if (!res.ok) { toast(errorText(res), "error"); return; }
+    subInput.value = "";
+    paint(res);
+    toast(tr("proxy.sub_added", { n: res.subs[res.subs.length - 1].count }), "ok");
+  });
 
   addButton.addEventListener("click", async () => {
     addButton.disabled = true;
@@ -1335,7 +1456,12 @@ function proxySection() {
     note,
     list,
     text,
-    h("div", { class: "actions" }, addButton)
+    h("div", { class: "actions" }, addButton),
+    h("h3", { class: "sub-title" }, tr("proxy.sub_title")),
+    h("p", { class: "meta" }, tr("proxy.sub_hint")),
+    subs,
+    field(tr("proxy.sub_title"), subInput),
+    h("div", { class: "actions" }, subButton)
   );
 }
 

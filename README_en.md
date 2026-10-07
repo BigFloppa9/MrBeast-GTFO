@@ -143,8 +143,8 @@ For the bot to grant itself access to the log channel, additionally give it **Ma
 | Section | Contents |
 |---|---|
 | **Logs** | Latest records as Discord-style messages: offender display name, username and ID, trigger text, channel link, images (identical ones stored once), action. Updates automatically |
-| **Status** | Bot state, ping, uptime, server list |
-| **Servers** | Per server: timeout reason, duration, delete period, log channel, auto-detection thresholds |
+| **Status** | Bot state, ping, uptime, control buttons, panel addresses on the network |
+| **Servers** | The server list and per server: timeout reason, duration, delete period, log channel, auto-detection thresholds |
 | **Settings** | Languages, administrator account link, token replacement, updates, removal of a user's data, proxy |
 
 In the panel logs, offender fields, trigger text and channel names are cut to 69 characters so spam can't bloat the history. Videos are not saved. Records are kept for at most 30 days (and at most 300 records).
@@ -164,9 +164,18 @@ If the password is lost:
 
 If no account was linked, stop the panel, delete `data/auth.json` and start the bot again: the setup runs from scratch.
 
+<h3 align="center">Bot control</h3>
+
+The bot status (online, paused, stopped) is always shown at the top of the panel. The **Status** tab has **Pause / Resume**, **Restart** and **Stop / Start** buttons. While paused, the bot does not react to image spam and manual commands still work; stopping disconnects the bot from Discord completely while the panel stays available. The chosen state is kept after a restart. The server list is in the **Servers** tab.
+
 <h3 align="center">Proxy (if Discord is blocked)</h3>
 
-In **Settings → Proxy** you can add up to 100 entries. The bot tries them in order; if the current one stops responding or the connection fails, it automatically switches to the next one. With no entries the bot connects directly.
+In **Settings → Proxy** you can add up to 100 entries as links or configs, and also a **subscription link**.
+
+- On every connection the bot checks **all** entries, connects to the fastest one and chooses again if it stops responding. If the selected entry's ping is above 1000 ms the bot looks for a faster one; if there is none, it stays on the fastest available.
+- If no entry works, the bot connects **directly**.
+- In the background, every 10 minutes all entries (including unused ones) are checked, and the "not working" status turns into "works" when a server comes back.
+- An entry that does not respond for more than a day is removed from the list automatically.
 
 Accepted (one link per line, or one or several configs in a row):
 
@@ -176,10 +185,19 @@ Accepted (one link per line, or one or several configs in a row):
 | HTTP | `http://host:3128` |
 | VLESS (link) | `vless://uuid@host:443?type=tcp&security=reality&pbk=…&sid=…&flow=xtls-rprx-vision#name` |
 | Xray / V2Ray config (JSON) | a full config from an app, for example a v2rayNG export |
+| Subscription | `https://provider/sub/…`: the bot downloads the server list, the "Update" button re-reads it |
 
-VLESS links support the `tcp`, `ws`, `grpc`, `httpupgrade` and `xhttp` transports and `none`, `tls`, `reality` security. For a JSON config the outbound proxy is taken (the one tagged `proxy`, or the first suitable one); other Xray protocols in such a config work too.
+VLESS links support the `tcp`, `ws`, `grpc`, `httpupgrade` and `xhttp` transports and `none`, `tls`, `reality` security. For a JSON config the outbound proxy is taken (the one tagged `proxy`, or the first suitable one); other Xray protocols in such a config work too. Subscription entries of other types (vmess, trojan, etc.) are skipped.
 
-For SOCKS5, VLESS and configs the bot uses the **Xray** core. It is downloaded automatically from GitHub on first use (with a checksum check) to `data/bin/xray`. If GitHub is unavailable, put the `xray` file into that folder manually. Entries are stored in `data/proxies.json` in encrypted form.
+For SOCKS5, VLESS and configs the bot uses the **Xray** core. It is downloaded automatically from GitHub on first use (with a checksum check) to `data/bin/xray`. If GitHub is unavailable, put the `xray` file into that folder manually. Entries and subscription links are stored in `data/proxies.json` in encrypted form.
+
+**If the subscription can't be downloaded from the phone** (for example, the subscription server blocks your IP), run this on a computer (Windows, Linux or macOS, Python 3 required):
+
+```bash
+python tools/subscription.py "https://provider/sub/…" -o servers.txt
+```
+
+`servers.txt` contains the server links: open it and paste the content into the Proxy field in the panel.
 
 <h3 align="center">Updating from the panel</h3>
 
@@ -238,7 +256,9 @@ The token, logs and images are encrypted (Fernet) and the key sits in a separate
 | The panel says Discord can't be reached | Discord may be blocked by your provider: add a proxy in **Settings → Proxy** or turn on a VPN on the device. The bot keeps retrying |
 | "Discord rejected this token" | The token was copied partially or has been reset. Get a new one in the Developer Portal and replace it in Settings |
 | The panel mentions Intents | Enable **Server Members Intent** and **Message Content Intent**, then restart the bot |
+| The bot is silent in direct messages | Pick `/reg` and `/log` from the list that appears after typing `/`; plain text is ignored and answered with a hint. If the list is empty, restart Discord |
 | Slash commands are not visible | Wait a few minutes and restart Discord. The bot must be added with the `applications.commands` scope |
+| The panel doesn't open from another device | The console prints all network addresses of the phone: use the one from your network (usually Wi-Fi). You can compare the phone's IP in the router. If it still fails, turn off "client isolation" (AP isolation) in the router and make sure both devices are on the same network |
 | Timeout is not applied | The bot's role is below the user's role, or the user is an administrator |
 | No report in the log channel | Check the bot's permissions there: View Channel, Send Messages, Embed Links |
 

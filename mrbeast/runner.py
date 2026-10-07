@@ -44,6 +44,7 @@ class BotRunner:
         self.stop_event: asyncio.Event | None = None
         self.error = ""
         self.running = False
+        self.direct_fallback = False
 
     async def start(self, token: str):
         await self.stop()
@@ -57,14 +58,12 @@ class BotRunner:
         pool = state.proxies
         while not stop_event.is_set():
             url = None
+            self.direct_fallback = False
             if pool.entries:
                 url = await pool.connect(stop_event)
-                if url is None:
-                    self.error = "proxy_failed"
-                    if await self.pause(stop_event, delay):
-                        break
-                    delay = min(delay * 2, 60)
-                    continue
+                self.direct_fallback = url is None
+                if self.direct_fallback:
+                    logger.warning("No proxy is working, trying a direct connection")
             state.proxy_url = url
             self.error = ""
             bot = GuardBot(proxy=url)
@@ -86,8 +85,8 @@ class BotRunner:
             if stop_event.is_set():
                 break
             if proxy_died:
-                logger.warning("Proxy stopped responding, switching to the next one")
-                await pool.advance()
+                logger.warning("Proxy stopped responding or got slow, choosing the best one again")
+                await pool.release()
                 delay = 5
                 continue
             if isinstance(result, discord.LoginFailure):
@@ -100,7 +99,8 @@ class BotRunner:
                 logger.error(f"Connection error: {result}")
                 self.error = "network"
                 if url:
-                    await pool.advance()
+                    pool.penalize()
+                    await pool.release()
             if await self.pause(stop_event, delay):
                 break
             delay = min(delay * 2, 60)
@@ -133,13 +133,25 @@ class BotRunner:
         self.running = False
         await state.proxies.stop()
 
+    def image_url(self, kind: str, ident: str = "") -> str | None:
+        bot = self.bot
+        if not bot or not bot.user:
+            return None
+        if kind == "bot":
+            return bot.user.display_avatar.replace(size=128, format="png").url
+        try:
+            guild = bot.get_guild(int(ident))
+        except ValueError:
+            return None
+        return guild.icon.replace(size=128, format="png").url if guild and guild.icon else None
+
     def snapshot(self) -> dict:
         bot = self.bot
         online = bool(bot and bot.is_ready() and not bot.is_closed())
         if online:
-            status = "online"
-            error = ""
-        elif self.running and self.error in ("network", "proxy_failed"):
+            status = "paused" if state.config.bot_state == "paused" else "online"
+            error = "proxy_failed" if self.direct_fallback else ""
+        elif self.running and self.error == "network":
             status = "reconnecting"
             error = self.error
         elif self.error:
@@ -153,8 +165,7 @@ class BotRunner:
             error = ""
         data = {"status": status, "error": error, "user": None, "latency": None, "uptime": None, "guilds": []}
         if online and bot.user:
-            avatar = bot.user.display_avatar.replace(size=128, format="png").url
-            data["user"] = {"id": str(bot.user.id), "name": bot.user.name, "avatar": avatar}
+            data["user"] = {"id": str(bot.user.id), "name": bot.user.name, "avatar": "/api/img/bot"}
             latency = bot.latency
             data["latency"] = round(latency * 1000) if math.isfinite(latency) else None
             data["uptime"] = int(time.time() - bot.ready_at) if bot.ready_at else None
@@ -163,7 +174,7 @@ class BotRunner:
                     "id": str(g.id),
                     "name": g.name,
                     "members": g.member_count,
-                    "icon": g.icon.replace(size=64, format="png").url if g.icon else None,
+                    "icon": f"/api/img/guild/{g.id}" if g.icon else None,
                 }
                 for g in sorted(bot.guilds, key=lambda g: g.name.lower())
             ]

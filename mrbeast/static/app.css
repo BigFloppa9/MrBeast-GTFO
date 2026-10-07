@@ -72,7 +72,16 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 .nav button.active { background: #404249; color: var(--text-strong); }
 .nav svg { width: 20px; height: 20px; flex: none; }
 .side-foot { padding: 8px; border-top: 1px solid rgba(0,0,0,.2); }
-.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); padding: 8px 10px; }
+.pill.top { padding: 4px 10px; background: var(--bg-deep); border-radius: 12px; }
+.top-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.addr { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; flex-wrap: wrap; }
+.guild.pick { width: 100%; background: none; border: 0; border-top: 1px solid rgba(255,255,255,.05); text-align: left; cursor: pointer; border-radius: 4px; color: inherit; }
+.guild.pick:first-of-type { border-top: 0; }
+.guild.pick:hover { background: var(--bg-hover); }
+.guild.pick.selected { background: #404249; }
+.sub-title { margin: 16px 0 6px; font-size: 16px; color: var(--text-strong); }
+.proxy-row.sub { grid-template-columns: auto 1fr auto auto auto; }
+.pill { align-items: center; gap: 6px; font-size: 13px; color: var(--muted); padding: 8px 10px; }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
 .dot.online { background: var(--green); }
 .dot.error { background: var(--red); }

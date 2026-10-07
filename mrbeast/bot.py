@@ -259,6 +259,7 @@ class Guard(commands.Cog):
         self.bot = bot
         self.image_tracker = defaultdict(lambda: defaultdict(list))
         self.processed_users = defaultdict(set)
+        self.hinted: dict[int, float] = {}
 
     async def run_auto(self, guild: discord.Guild, target: discord.Member, trigger_msg: discord.Message, evidence: list):
         s = state.settings.get(guild.id)
@@ -275,9 +276,25 @@ class Guard(commands.Cog):
         await send_log(guild, build_embed("auto", target, s, deleted, trigger_msg=trigger_msg))
         record_log("auto", guild, target, s, deleted, trigger_msg=trigger_msg, images=images)
 
+    async def dm_hint(self, message: discord.Message):
+        now = time.monotonic()
+        if now - self.hinted.get(message.author.id, 0) < 30:
+            return
+        self.hinted[message.author.id] = now
+        logger.info(f"[DM] message from {message.author}")
+        try:
+            await message.channel.send(t(lang(), "dm_hint"))
+        except discord.HTTPException:
+            pass
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        if message.author.bot or not message.guild:
+        if message.author.bot:
+            return
+        if not message.guild:
+            await self.dm_hint(message)
+            return
+        if state.config.bot_state == "paused":
             return
 
         has_image = (
@@ -413,6 +430,7 @@ class Guard(commands.Cog):
     @app_commands.allowed_contexts(guilds=False, dms=True, private_channels=False)
     async def reg(self, interaction: discord.Interaction, code: str):
         lg = lang()
+        logger.info(f"[DM] /reg from {interaction.user}")
         if not is_admin_somewhere(self.bot, interaction.user.id):
             await interaction.response.send_message(t(lg, "dm_reg_not_admin"))
             return
@@ -427,6 +445,7 @@ class Guard(commands.Cog):
     @app_commands.allowed_contexts(guilds=False, dms=True, private_channels=False)
     async def log(self, interaction: discord.Interaction):
         lg = lang()
+        logger.info(f"[DM] /log from {interaction.user}")
         if not state.config.moderator_id or interaction.user.id != state.config.moderator_id:
             await interaction.response.send_message(t(lg, "dm_log_denied"))
             return

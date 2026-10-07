@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import copy
 import hashlib
 import io
@@ -31,6 +32,14 @@ XRAY_MAX_BYTES = 80 * 1024 * 1024
 SKIP_PROTOCOLS = {"freedom", "blackhole", "dns", "loopback", "direct", "block"}
 TRANSPORTS = {"tcp", "ws", "grpc", "httpupgrade", "xhttp"}
 WATCH_INTERVAL = 20
+PROBE_TIMEOUT = 8
+SLOW_MS = 1000
+RECHECK_INTERVAL = 300
+MAINTAIN_INTERVAL = 600
+DOWN_LIMIT = 86400
+PENALTY_SECONDS = 180
+SUB_UA = "Happ/2.0.0"
+SUB_MAX_BYTES = 2 * 1024 * 1024
 
 
 class ParseError(ValueError):
@@ -199,18 +208,77 @@ def parse_text(text: str) -> tuple[list[dict], list[dict]]:
     return entries, errors
 
 
-def build_xray_config(outbound: dict, port: int) -> dict:
+def prepare_outbound(outbound: dict, tag: str) -> dict:
     out = copy.deepcopy(outbound)
-    out["tag"] = "proxy"
+    out["tag"] = tag
     out.pop("sendThrough", None)
     out.setdefault("streamSettings", {}).setdefault("sockopt", {}).setdefault("domainStrategy", "UseIPv4")
+    return out
+
+
+def base_config(inbounds: list, outbounds: list, rules: list) -> dict:
     return {
         "log": {"loglevel": "warning"},
         "dns": {"servers": ["1.1.1.1", "8.8.8.8"], "queryStrategy": "UseIPv4"},
-        "inbounds": [{"tag": "http", "listen": "127.0.0.1", "port": port, "protocol": "http", "settings": {}}],
-        "outbounds": [out, {"tag": "direct", "protocol": "freedom"}],
-        "routing": {"domainStrategy": "AsIs", "rules": [{"type": "field", "inboundTag": ["http"], "outboundTag": "proxy"}]},
+        "inbounds": inbounds,
+        "outbounds": outbounds + [{"tag": "direct", "protocol": "freedom"}],
+        "routing": {"domainStrategy": "AsIs", "rules": rules},
     }
+
+
+def http_inbound(tag: str, port: int) -> dict:
+    return {"tag": tag, "listen": "127.0.0.1", "port": port, "protocol": "http", "settings": {}}
+
+
+def build_xray_config(outbound: dict, port: int) -> dict:
+    return base_config(
+        [http_inbound("http", port)], [prepare_outbound(outbound, "proxy")],
+        [{"type": "field", "inboundTag": ["http"], "outboundTag": "proxy"}],
+    )
+
+
+def build_multi_config(entries: list[dict]) -> tuple[dict, dict]:
+    ports = dict(zip((e["id"] for e in entries), free_ports(len(entries))))
+    inbounds, outbounds, rules = [], [], []
+    for i, entry in enumerate(entries):
+        inbounds.append(http_inbound(f"i{i}", ports[entry["id"]]))
+        outbounds.append(prepare_outbound(entry["outbound"], f"o{i}"))
+        rules.append({"type": "field", "inboundTag": [f"i{i}"], "outboundTag": f"o{i}"})
+    return base_config(inbounds, outbounds, rules), ports
+
+
+def decode_subscription(body: str) -> str:
+    text = (body or "").strip().lstrip("\ufeff")
+    if not text or text[0] in "{[" or "://" in text.splitlines()[0]:
+        return text
+    compact = re.sub(r"\s+", "", text).replace("-", "+").replace("_", "/")
+    try:
+        raw = base64.b64decode(compact + "=" * (-len(compact) % 4)).decode("utf-8", errors="ignore").strip()
+    except ValueError:
+        return text
+    return raw if raw and (raw[0] in "{[" or "://" in raw) else text
+
+
+def parse_subscription(body: str) -> tuple[list[dict], int]:
+    entries, errors = parse_text(decode_subscription(body))
+    return entries, len([e for e in errors if e["code"] != "empty"])
+
+
+async def fetch_subscription(url: str, via: str | None = None) -> str:
+    last = "failed"
+    for proxy in ((None, via) if via else (None,)):
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=25), headers={"User-Agent": SUB_UA}) as session:
+                async with session.get(url, proxy=proxy) as resp:
+                    if resp.status != 200:
+                        raise RuntimeError(f"HTTP {resp.status}")
+                    data = await resp.content.read(SUB_MAX_BYTES + 1)
+                    if len(data) > SUB_MAX_BYTES:
+                        raise RuntimeError("too large")
+                    return data.decode("utf-8", errors="replace")
+        except (aiohttp.ClientError, asyncio.TimeoutError, RuntimeError) as e:
+            last = str(e) or type(e).__name__
+    raise RuntimeError(last[:160])
 
 
 def asset_name() -> str | None:
@@ -224,10 +292,15 @@ def asset_name() -> str | None:
     return f"Xray-{system}-{arch}.zip"
 
 
-def free_port() -> int:
-    with socket.socket() as sock:
-        sock.bind(("127.0.0.1", 0))
-        return sock.getsockname()[1]
+def free_ports(count: int) -> list[int]:
+    socks = [socket.socket() for _ in range(count)]
+    try:
+        for sock in socks:
+            sock.bind(("127.0.0.1", 0))
+        return [sock.getsockname()[1] for sock in socks]
+    finally:
+        for sock in socks:
+            sock.close()
 
 
 async def download(url: str, limit: int) -> bytes:
@@ -244,23 +317,24 @@ async def download(url: str, limit: int) -> bytes:
             return bytes(buf)
 
 
-async def probe(url: str) -> tuple[bool, int, str]:
+async def probe(url: str, timeout: int = 15) -> tuple[bool, int, str]:
     started = time.monotonic()
     try:
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
             async with session.get(PROBE_URL, proxy=url) as resp:
                 if resp.status == 200:
-                    return True, int((time.monotonic() - started) * 1000), ""
+                    return True, max(1, int((time.monotonic() - started) * 1000)), ""
                 return False, 0, f"HTTP {resp.status}"
     except (aiohttp.ClientError, asyncio.TimeoutError) as e:
         return False, 0, type(e).__name__
 
 
 class Xray:
-    def __init__(self):
+    def __init__(self, name: str = "main"):
         self.proc: asyncio.subprocess.Process | None = None
-        self.log = XRAY_DIR / "xray.log"
-        self.pidfile = XRAY_DIR / "xray.pid"
+        self.config = XRAY_DIR / f"{name}.json"
+        self.log = XRAY_DIR / f"{name}.log"
+        self.pidfile = XRAY_DIR / f"{name}.pid"
         self.cleanup_stale()
 
     def cleanup_stale(self):
@@ -280,18 +354,16 @@ class Xray:
         except OSError:
             return ""
 
-    async def start(self, binary: str, outbound: dict) -> tuple[str | None, str]:
+    async def start(self, binary: str, conf: dict, port: int) -> str:
         await self.stop()
         ensure_dirs()
         XRAY_DIR.mkdir(parents=True, exist_ok=True)
-        port = free_port()
-        config = XRAY_DIR / "config.json"
-        write_json(config, build_xray_config(outbound, port))
+        write_json(self.config, conf)
         with open(self.log, "wb") as log:
             try:
-                self.proc = await asyncio.create_subprocess_exec(binary, "run", "-c", str(config), stdout=log, stderr=asyncio.subprocess.STDOUT)
+                self.proc = await asyncio.create_subprocess_exec(binary, "run", "-c", str(self.config), stdout=log, stderr=asyncio.subprocess.STDOUT)
             except OSError as e:
-                return None, str(e)
+                return str(e)
         try:
             self.pidfile.write_text(str(self.proc.pid))
         except OSError:
@@ -299,15 +371,15 @@ class Xray:
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
             if self.proc.returncode is not None:
-                return None, self.tail() or f"exit {self.proc.returncode}"
+                return self.tail() or f"exit {self.proc.returncode}"
             try:
                 _, writer = await asyncio.open_connection("127.0.0.1", port)
                 writer.close()
-                return f"http://127.0.0.1:{port}", ""
+                return ""
             except OSError:
                 await asyncio.sleep(0.2)
         await self.stop()
-        return None, "start timeout"
+        return "start timeout"
 
     async def stop(self):
         proc, self.proc = self.proc, None
@@ -327,28 +399,42 @@ class Xray:
 class ProxyPool:
     def __init__(self, fernet: Fernet):
         self.fernet = fernet
-        self.entries: list[dict] = self.load()
-        self.index = 0
+        self.entries, self.subs = self.load()
         self.active = ""
         self.url: str | None = None
         self.status: dict[str, dict] = {}
         self.binary = {"state": "", "detail": ""}
-        self.xray = Xray()
+        self.xray = Xray("main")
+        self.prober = Xray("probe")
+        self.probe_lock = asyncio.Lock()
+        self.dirty = False
+        self.last_full = 0.0
+        self.penalty: dict[str, float] = {}
 
-    def load(self) -> list[dict]:
+    def load(self) -> tuple[list[dict], list[dict]]:
         try:
             data = json.loads(self.fernet.decrypt(PROXIES_FILE.read_bytes()))
         except (OSError, InvalidToken, ValueError):
-            return []
-        return [e for e in data if isinstance(e, dict) and e.get("id")] if isinstance(data, list) else []
+            return [], []
+        if isinstance(data, list):
+            data = {"entries": data, "subs": []}
+        if not isinstance(data, dict):
+            return [], []
+        entries = [e for e in data.get("entries", []) if isinstance(e, dict) and e.get("id")]
+        subs = [s for s in data.get("subs", []) if isinstance(s, dict) and s.get("id")]
+        return entries, subs
 
     def save(self):
-        payload = json.dumps(self.entries, ensure_ascii=False).encode("utf-8")
+        payload = json.dumps({"entries": self.entries, "subs": self.subs}, ensure_ascii=False).encode("utf-8")
         write_bytes_atomic(PROXIES_FILE, self.fernet.encrypt(payload))
+        self.dirty = False
+
+    def flush(self):
+        if self.dirty:
+            self.save()
 
     def add(self, entries: list[dict]) -> int:
-        room = max(0, MAX_PROXIES - len(self.entries))
-        taken = entries[:room]
+        taken = entries[:max(0, MAX_PROXIES - len(self.entries))]
         self.entries.extend(taken)
         if taken:
             self.save()
@@ -362,21 +448,45 @@ class ProxyPool:
         self.status.pop(entry_id, None)
         if self.active == entry_id:
             self.active, self.url = "", None
-        self.index = 0
+        self.save()
+        return True
+
+    def set_subscription(self, url: str, entries: list[dict], sub_id: str | None = None) -> dict:
+        sub = next((s for s in self.subs if s["id"] == sub_id), None)
+        if sub is None:
+            sub = {"id": secrets.token_hex(4), "url": url, "label": (urlsplit(url).hostname or url)[:60]}
+            self.subs.append(sub)
+        self.entries = [e for e in self.entries if e.get("sub") != sub["id"]]
+        room = max(0, MAX_PROXIES - len(self.entries))
+        for entry in entries[:room]:
+            entry["sub"] = sub["id"]
+            self.entries.append(entry)
+        sub["count"] = min(len(entries), room)
+        sub["updated"] = int(time.time())
+        self.save()
+        return sub
+
+    def remove_subscription(self, sub_id: str) -> bool:
+        kept = [s for s in self.subs if s["id"] != sub_id]
+        if len(kept) == len(self.subs):
+            return False
+        self.subs = kept
+        self.entries = [e for e in self.entries if e.get("sub") != sub_id]
+        if self.active and not any(e["id"] == self.active for e in self.entries):
+            self.active, self.url = "", None
         self.save()
         return True
 
     def view(self) -> dict:
         rows = []
         for entry in self.entries:
-            kind = entry["type"]
-            if kind == "xray":
-                kind = entry.get("protocol", "xray")
+            kind = entry.get("protocol", "xray") if entry["type"] == "xray" else entry["type"]
             rows.append({
-                "id": entry["id"], "type": kind, "label": entry["label"],
+                "id": entry["id"], "type": kind, "label": entry["label"], "sub": entry.get("sub", ""),
                 "active": entry["id"] == self.active, "status": self.status.get(entry["id"]),
             })
-        return {"entries": rows, "max": MAX_PROXIES, "binary": self.binary}
+        subs = [{"id": s["id"], "label": s["label"], "count": s.get("count", 0), "updated": s.get("updated", 0)} for s in self.subs]
+        return {"entries": rows, "subs": subs, "max": MAX_PROXIES, "binary": self.binary}
 
     def binary_path(self) -> str | None:
         for candidate in (os.environ.get("MRBEAST_XRAY"), shutil.which("xray"), str(BIN_DIR / "xray")):
@@ -414,7 +524,72 @@ class ProxyPool:
         return str(BIN_DIR / "xray")
 
     def record(self, entry_id: str, ok: bool, ms: int = 0, error: str = ""):
+        entry = next((e for e in self.entries if e["id"] == entry_id), None)
+        if entry is None:
+            return
         self.status[entry_id] = {"ok": ok, "ms": ms, "error": error}
+        if ok and "down_since" in entry:
+            del entry["down_since"]
+            self.dirty = True
+        elif not ok and "down_since" not in entry:
+            entry["down_since"] = int(time.time())
+            self.dirty = True
+
+    def cleanup(self) -> int:
+        limit = time.time() - DOWN_LIMIT
+        keep = [e for e in self.entries if e["id"] == self.active or e.get("down_since", time.time()) > limit]
+        removed = len(self.entries) - len(keep)
+        if removed:
+            self.entries = keep
+            self.dirty = True
+        return removed
+
+    async def probe_group(self, entries: list[dict]) -> dict:
+        binary = await self.ensure_binary()
+        if not binary:
+            return {e["id"]: (False, 0, "xray") for e in entries}
+        conf, ports = build_multi_config(entries)
+        error = await self.prober.start(binary, conf, next(iter(ports.values())))
+        if error:
+            await self.prober.stop()
+            if len(entries) == 1:
+                return {entries[0]["id"]: (False, 0, error[:120])}
+            merged = {}
+            for entry in entries:
+                merged.update(await self.probe_group([entry]))
+            return merged
+        try:
+            gate = asyncio.Semaphore(20)
+
+            async def one(entry):
+                async with gate:
+                    return entry["id"], await probe(f"http://127.0.0.1:{ports[entry['id']]}", PROBE_TIMEOUT)
+
+            return dict(await asyncio.gather(*(one(e) for e in entries)))
+        finally:
+            await self.prober.stop()
+
+    async def probe_all(self) -> dict:
+        async with self.probe_lock:
+            results: dict = {}
+            gate = asyncio.Semaphore(20)
+
+            async def direct(entry):
+                async with gate:
+                    results[entry["id"]] = await probe(entry["url"], PROBE_TIMEOUT)
+
+            plain = [e for e in self.entries if e["type"] == "http"]
+            other = [e for e in self.entries if e["type"] != "http"]
+
+            async def grouped():
+                if other:
+                    results.update(await self.probe_group(other))
+
+            await asyncio.gather(grouped(), *(direct(e) for e in plain))
+            for entry_id, (ok, ms, error) in results.items():
+                self.record(entry_id, ok, ms, error)
+            self.flush()
+            return results
 
     async def open_entry(self, entry: dict) -> str | None:
         if entry["type"] == "http":
@@ -424,49 +599,83 @@ class ProxyPool:
         if not binary:
             self.record(entry["id"], False, 0, "xray")
             return None
-        url, error = await self.xray.start(binary, entry["outbound"])
-        if url is None:
+        port = free_ports(1)[0]
+        error = await self.xray.start(binary, build_xray_config(entry["outbound"], port), port)
+        if error:
             logger.error(f"Xray start failed for {entry['label']}: {error}")
             self.record(entry["id"], False, 0, error[:120])
-        return url
+            return None
+        return f"http://127.0.0.1:{port}"
 
     async def connect(self, stop: asyncio.Event) -> str | None:
-        count = len(self.entries)
-        for step in range(count):
+        results = await self.probe_all()
+        now = time.monotonic()
+        ranked = sorted(
+            (e for e in self.entries if results.get(e["id"], (False,))[0]),
+            key=lambda e: (self.penalty.get(e["id"], 0) > now, results[e["id"]][1]),
+        )
+        for entry in ranked:
             if stop.is_set():
                 return None
-            position = (self.index + step) % count
-            entry = self.entries[position]
             url = await self.open_entry(entry)
             if url:
                 ok, ms, error = await probe(url)
                 self.record(entry["id"], ok, ms, error)
                 if ok:
-                    self.index, self.active, self.url = position, entry["id"], url
+                    self.active, self.url, self.last_full = entry["id"], url, time.monotonic()
+                    self.flush()
                     logger.info(f"Using proxy {entry['label']} ({ms} ms)")
                     return url
         await self.xray.stop()
         self.active, self.url = "", None
+        self.flush()
         return None
 
     async def watch(self):
         misses = 0
         while True:
             await asyncio.sleep(WATCH_INTERVAL)
-            if self.entries and self.entries[self.index % len(self.entries)]["type"] != "http" and not self.xray.alive():
+            active = next((e for e in self.entries if e["id"] == self.active), None)
+            if active is None:
+                return
+            if active["type"] != "http" and not self.xray.alive():
+                self.record(self.active, False, 0, "xray stopped")
                 return
             ok, ms, error = await probe(self.url)
             self.record(self.active, ok, ms, error)
-            misses = 0 if ok else misses + 1
-            if misses >= 2:
-                return
+            if not ok:
+                misses += 1
+                if misses >= 2:
+                    return
+                continue
+            misses = 0
+            if ms > SLOW_MS and time.monotonic() - self.last_full > RECHECK_INTERVAL:
+                results = await self.probe_all()
+                self.last_full = time.monotonic()
+                better = [(r[1], i) for i, r in results.items() if r[0] and i != self.active]
+                if better and min(better)[0] < ms:
+                    return
 
-    async def advance(self):
-        if self.entries:
-            self.index = (self.index + 1) % len(self.entries)
+    def penalize(self):
+        if self.active:
+            self.penalty[self.active] = time.monotonic() + PENALTY_SECONDS
+
+    async def release(self):
         self.active, self.url = "", None
         await self.xray.stop()
+
+    async def maintain(self, stop: asyncio.Event):
+        while True:
+            try:
+                await asyncio.wait_for(stop.wait(), MAINTAIN_INTERVAL)
+                return
+            except asyncio.TimeoutError:
+                pass
+            if self.entries:
+                await self.probe_all()
+                if self.cleanup():
+                    self.flush()
 
     async def stop(self):
-        self.active, self.url = "", None
-        await self.xray.stop()
+        await self.release()
+        await self.prober.stop()
