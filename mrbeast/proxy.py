@@ -15,16 +15,18 @@ import socket
 import time
 import uuid
 import zipfile
-from urllib.parse import parse_qs, unquote, urlsplit
+from urllib.parse import parse_qs, quote, unquote, urlsplit
 
 import aiohttp
+
+from . import happ_crypt
 from cryptography.fernet import Fernet, InvalidToken
 
 from .config import BIN_DIR, PROXIES_FILE, XRAY_DIR, ensure_dirs, write_bytes_atomic, write_json
 
 logger = logging.getLogger("mrbeast.proxy")
 
-MAX_PROXIES = 100
+MAX_PROXIES = 1000
 MAX_LINE = 8000
 PROBE_URL = "https://discord.com/api/v10/gateway"
 XRAY_RELEASE = "https://github.com/XTLS/Xray-core/releases/latest/download"
@@ -33,13 +35,25 @@ SKIP_PROTOCOLS = {"freedom", "blackhole", "dns", "loopback", "direct", "block"}
 TRANSPORTS = {"tcp", "ws", "grpc", "httpupgrade", "xhttp"}
 WATCH_INTERVAL = 20
 PROBE_TIMEOUT = 8
-SLOW_MS = 1000
+SLOW_MS = 3000
+PROBE_CHUNK = 60
 RECHECK_INTERVAL = 300
 MAINTAIN_INTERVAL = 600
 DOWN_LIMIT = 86400
 PENALTY_SECONDS = 180
-SUB_UA = "Happ/2.0.0"
-SUB_MAX_BYTES = 2 * 1024 * 1024
+SUB_AGENTS = (
+    "Happ/2.0.0",
+    "v2rayN/7.8.2",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+    "curl/8.5.0",
+)
+SUB_MAX_BYTES = 4 * 1024 * 1024
+SUB_TIMEOUT = 15
+RECOVER_INTERVAL = 90
+FIRST_CHECK_DELAY = 45
+CHECK_GAP_CAP = 1800
+NET_PROBES = (("1.1.1.1", 443), ("8.8.8.8", 443), ("9.9.9.9", 443), ("77.88.8.8", 443))
+WRAP_SCHEMES = {"happ", "v2raytun", "hiddify", "incy", "sub", "clash", "clashmeta", "sing-box", "v2rayng", "v2rayn", "karing", "flclash", "stash", "shadowrocket", "streisand", "nekobox", "husi", "singbox"}
 
 
 class ParseError(ValueError):
@@ -76,24 +90,17 @@ def parse_socks(parts, host, port) -> dict:
     return make_entry("socks5", unquote(parts.fragment) or f"{host}:{port}", outbound=outbound)
 
 
-def parse_vless(parts, host, port) -> dict:
-    if not host or not port or not parts.username:
-        raise ParseError("bad_link")
-    try:
-        user_id = str(uuid.UUID(unquote(parts.username)))
-    except ValueError:
-        raise ParseError("bad_uuid")
-    q = {k: v[0] for k, v in parse_qs(parts.query, keep_blank_values=True).items()}
-    network = {"raw": "tcp"}.get(q.get("type", "tcp"), q.get("type", "tcp"))
+def query_of(parts) -> dict:
+    return {k: v[0] for k, v in parse_qs(parts.query, keep_blank_values=True).items()}
+
+
+def build_stream(q: dict, default_security: str = "none") -> dict:
+    network = {"raw": "tcp", "splithttp": "xhttp", "h2": "http"}.get(q.get("type", "tcp"), q.get("type", "tcp"))
     if network not in TRANSPORTS:
         raise ParseError("unsupported_transport")
-    security = q.get("security", "none")
+    security = q.get("security") or default_security or "none"
     if security not in ("none", "tls", "reality"):
         raise ParseError("unsupported_security")
-
-    user = {"id": user_id, "encryption": q.get("encryption", "none")}
-    if q.get("flow"):
-        user["flow"] = q["flow"]
 
     stream = {"network": network, "security": security}
     if network == "ws":
@@ -106,13 +113,21 @@ def parse_vless(parts, host, port) -> dict:
     elif network == "httpupgrade":
         stream["httpupgradeSettings"] = {"path": q.get("path", "/"), "host": q.get("host", "")}
     elif network == "xhttp":
-        stream["xhttpSettings"] = {"path": q.get("path", "/"), "host": q.get("host", ""), "mode": q.get("mode", "auto")}
+        xhttp = {"path": q.get("path", "/"), "host": q.get("host", ""), "mode": q.get("mode", "auto")}
+        if q.get("extra"):
+            try:
+                extra = json.loads(q["extra"])
+            except ValueError:
+                extra = None
+            if isinstance(extra, dict):
+                xhttp["extra"] = extra
+        stream["xhttpSettings"] = xhttp
 
     if security == "tls":
-        tls = {k: v for k, v in (("serverName", q.get("sni")), ("fingerprint", q.get("fp"))) if v}
+        tls = {k: v for k, v in (("serverName", q.get("sni") or q.get("peer")), ("fingerprint", q.get("fp"))) if v}
         if q.get("alpn"):
-            tls["alpn"] = q["alpn"].split(",")
-        if q.get("allowInsecure") in ("1", "true"):
+            tls["alpn"] = [a for a in q["alpn"].split(",") if a]
+        if q.get("allowInsecure") in ("1", "true") or q.get("insecure") in ("1", "true"):
             tls["allowInsecure"] = True
         stream["tlsSettings"] = tls
     elif security == "reality":
@@ -125,27 +140,161 @@ def parse_vless(parts, host, port) -> dict:
             "shortId": q.get("sid", ""),
             "spiderX": q.get("spx", ""),
         }
+    return stream
 
+
+def label_of(parts, host, port) -> str:
+    return unquote(parts.fragment).strip() or f"{host}:{port}"
+
+
+def parse_vless(parts, host, port) -> dict:
+    if not host or not port or not parts.username:
+        raise ParseError("bad_link")
+    try:
+        user_id = str(uuid.UUID(unquote(parts.username)))
+    except ValueError:
+        raise ParseError("bad_uuid")
+    q = query_of(parts)
+    user = {"id": user_id, "encryption": q.get("encryption", "none")}
+    if q.get("flow"):
+        user["flow"] = q["flow"]
     outbound = {
         "protocol": "vless",
         "settings": {"vnext": [{"address": host, "port": port, "users": [user]}]},
-        "streamSettings": stream,
+        "streamSettings": build_stream(q),
     }
-    return make_entry("vless", unquote(parts.fragment) or f"{host}:{port}", outbound=outbound)
+    return make_entry("vless", label_of(parts, host, port), outbound=outbound)
+
+
+def b64_text(raw: str) -> str:
+    compact = re.sub(r"\s+", "", raw).replace("-", "+").replace("_", "/")
+    try:
+        return base64.b64decode(compact + "=" * (-len(compact) % 4)).decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        raise ParseError("bad_link")
+
+
+def parse_vmess(line: str) -> dict:
+    try:
+        data = json.loads(b64_text(line.split("://", 1)[1].split("#", 1)[0]))
+    except ValueError:
+        raise ParseError("bad_link")
+    if not isinstance(data, dict) or not data.get("add") or not data.get("id"):
+        raise ParseError("bad_link")
+    try:
+        port, user_id = int(data.get("port")), str(uuid.UUID(str(data["id"])))
+        alter = int(data.get("aid") or 0)
+    except (TypeError, ValueError):
+        raise ParseError("bad_link")
+    q = {
+        "type": str(data.get("net") or "tcp"), "path": str(data.get("path") or "/"), "host": str(data.get("host") or ""),
+        "security": "tls" if str(data.get("tls") or "").lower() == "tls" else "none",
+        "sni": str(data.get("sni") or ""), "alpn": str(data.get("alpn") or ""), "fp": str(data.get("fp") or ""),
+        "serviceName": str(data.get("path") or ""), "mode": "multi" if data.get("type") == "multi" else "gun",
+    }
+    outbound = {
+        "protocol": "vmess",
+        "settings": {"vnext": [{"address": str(data["add"]), "port": port, "users": [{"id": user_id, "alterId": alter, "security": str(data.get("scy") or "auto")}]}]},
+        "streamSettings": build_stream(q),
+    }
+    return make_entry("vmess", str(data.get("ps") or f"{data['add']}:{port}"), outbound=outbound)
+
+
+def parse_trojan(parts, host, port) -> dict:
+    if not host or not port or not parts.username:
+        raise ParseError("bad_link")
+    q = query_of(parts)
+    outbound = {
+        "protocol": "trojan",
+        "settings": {"servers": [{"address": host, "port": port, "password": unquote(parts.username)}]},
+        "streamSettings": build_stream(q, "tls"),
+    }
+    return make_entry("trojan", label_of(parts, host, port), outbound=outbound)
+
+
+def parse_ss(line: str) -> dict:
+    body, _, fragment = line.split("://", 1)[1].partition("#")
+    body, _, query = body.partition("?")
+    if "plugin=" in query:
+        raise ParseError("unsupported_plugin")
+    if "@" not in body:
+        body = b64_text(body)
+    userinfo, _, hostport = body.rpartition("@")
+    if not userinfo or ":" not in hostport:
+        raise ParseError("bad_link")
+    if ":" not in userinfo:
+        userinfo = b64_text(userinfo)
+    method, _, password = unquote(userinfo).partition(":")
+    host, _, port_text = hostport.rpartition(":")
+    try:
+        port = int(port_text)
+    except ValueError:
+        raise ParseError("bad_link")
+    if not method or not host:
+        raise ParseError("bad_link")
+    outbound = {"protocol": "shadowsocks", "settings": {"servers": [{"address": host.strip("[]"), "port": port, "method": method, "password": password}]}}
+    return make_entry("shadowsocks", unquote(fragment).strip() or f"{host}:{port}", outbound=outbound)
+
+
+def unwrap_link(line: str) -> str:
+    low = line.lower()
+    crypt = re.match(r"happ://(crypt\d*)/", line, re.I)
+    if crypt:
+        if crypt.group(1).lower() == "crypt5":
+            return line
+        raise ParseError("crypt_unsupported")
+    if "happ%3a%2f%2fcrypt" in low:
+        raise ParseError("crypt_unsupported")
+    scheme = low.split("://", 1)[0] if "://" in low else ""
+    tg = urlsplit(line) if scheme in ("tg", "http", "https") else None
+    if tg is not None and (scheme == "tg" or (tg.hostname or "").lower() in ("t.me", "telegram.me")):
+        kind = tg.netloc if scheme == "tg" else tg.path.strip("/")
+        q = {k: v[0] for k, v in parse_qs(tg.query).items()}
+        if kind == "socks" and q.get("server") and q.get("port"):
+            auth = f"{quote(q.get('user', ''), safe='')}:{quote(q.get('pass', ''), safe='')}@" if q.get("user") else ""
+            return f"socks5://{auth}{q['server']}:{q['port']}"
+        if kind in ("proxy", "mtproto", "socks"):
+            raise ParseError("mtproto_unsupported")
+    if scheme in WRAP_SCHEMES:
+        rest = unquote(line.split("://", 1)[1])
+        found = re.search(r"https?://[^\s]+", rest)
+        if found:
+            return found.group(0)
+        raise ParseError("bad_link")
+    return line
+
+
+def is_sub_url(line: str) -> bool:
+    if line.lower().startswith("happ://crypt5/"):
+        return True
+    try:
+        parts = urlsplit(line)
+    except ValueError:
+        return False
+    if parts.scheme.lower() not in ("http", "https") or not parts.hostname:
+        return False
+    return parts.scheme.lower() == "https" or parts.path not in ("", "/") or bool(parts.query)
 
 
 def parse_link(line: str) -> dict:
     line = line.strip()
     if len(line) > MAX_LINE:
         raise ParseError("too_long")
+    low = line.lower()
+    if low.startswith("vmess://"):
+        return parse_vmess(line)
+    if low.startswith("ss://"):
+        return parse_ss(line)
     parts, host, port = parts_of(line)
     scheme = parts.scheme.lower()
     if scheme == "http":
         return parse_http(parts, host, port)
-    if scheme in ("socks5", "socks5h"):
+    if scheme in ("socks5", "socks5h", "socks"):
         return parse_socks(parts, host, port)
     if scheme == "vless":
         return parse_vless(parts, host, port)
+    if scheme == "trojan":
+        return parse_trojan(parts, host, port)
     raise ParseError("unsupported")
 
 
@@ -160,6 +309,266 @@ def describe(outbound: dict) -> str:
     return str(outbound.get("protocol", "proxy"))
 
 
+FORM_KINDS = ("socks5", "http", "vless", "vmess", "trojan", "shadowsocks", "xray")
+STREAM_KINDS = ("vless", "vmess", "trojan")
+SS_METHODS = (
+    "aes-128-gcm", "aes-256-gcm", "chacha20-ietf-poly1305", "xchacha20-ietf-poly1305",
+    "2022-blake3-aes-128-gcm", "2022-blake3-aes-256-gcm", "2022-blake3-chacha20-poly1305",
+)
+
+
+def text_field(fields: dict, key: str, limit: int = 300) -> str:
+    value = fields.get(key)
+    if value is None:
+        return ""
+    value = str(value).strip()
+    if len(value) > limit:
+        raise ParseError("too_long")
+    return value
+
+
+def port_field(fields: dict) -> int:
+    try:
+        port = int(str(fields.get("port") or "").strip())
+    except ValueError:
+        raise ParseError("bad_port")
+    if not 1 <= port <= 65535:
+        raise ParseError("bad_port")
+    return port
+
+
+def stream_query(fields: dict) -> dict:
+    q = {
+        "type": text_field(fields, "network") or "tcp",
+        "security": text_field(fields, "security"),
+        "sni": text_field(fields, "sni"),
+        "fp": text_field(fields, "fp"),
+        "alpn": text_field(fields, "alpn"),
+        "pbk": text_field(fields, "pbk"),
+        "sid": text_field(fields, "sid"),
+        "spx": text_field(fields, "spx"),
+        "path": text_field(fields, "path") or "/",
+        "host": text_field(fields, "host_header"),
+        "serviceName": text_field(fields, "service"),
+        "mode": text_field(fields, "mode"),
+    }
+    if fields.get("allow_insecure") in (True, "1", "true", 1):
+        q["allowInsecure"] = "1"
+    if not q["mode"]:
+        q.pop("mode")
+    return q
+
+
+def entry_from_fields(kind: str, fields: dict) -> dict:
+    if kind not in FORM_KINDS or not isinstance(fields, dict):
+        raise ParseError("unsupported")
+    label = text_field(fields, "label", 80)
+    if kind == "xray":
+        try:
+            obj = json.loads(text_field(fields, "json", 20000))
+        except ValueError:
+            raise ParseError("bad_json")
+        entry = parse_config(obj)
+        if label:
+            entry["label"] = label
+        return entry
+    host = text_field(fields, "host")
+    if not host or any(ch in host for ch in " /?#@"):
+        raise ParseError("bad_link")
+    port = port_field(fields)
+    label = label or f"{host}:{port}"
+    address = host.strip("[]")
+    if kind == "http":
+        user, password = text_field(fields, "user"), text_field(fields, "password")
+        auth = f"{quote(user, safe='')}:{quote(password, safe='')}@" if user else ""
+        shown = f"[{address}]" if ":" in address else address
+        return make_entry("http", label, url=f"http://{auth}{shown}:{port}")
+    if kind == "socks5":
+        server = {"address": address, "port": port}
+        if text_field(fields, "user"):
+            server["users"] = [{"user": text_field(fields, "user"), "pass": text_field(fields, "password")}]
+        return make_entry("socks5", label, outbound={"protocol": "socks", "settings": {"servers": [server]}})
+    if kind == "shadowsocks":
+        method, password = text_field(fields, "method"), text_field(fields, "password")
+        if method not in SS_METHODS or not password:
+            raise ParseError("bad_link")
+        server = {"address": address, "port": port, "method": method, "password": password}
+        return make_entry("shadowsocks", label, outbound={"protocol": "shadowsocks", "settings": {"servers": [server]}})
+    if kind == "trojan":
+        password = text_field(fields, "password")
+        if not password:
+            raise ParseError("bad_link")
+        stream = build_stream(stream_query(fields), "tls")
+        outbound = {"protocol": "trojan", "settings": {"servers": [{"address": address, "port": port, "password": password}]}, "streamSettings": stream}
+        return make_entry("trojan", label, outbound=outbound)
+    try:
+        user_id = str(uuid.UUID(text_field(fields, "id")))
+    except ValueError:
+        raise ParseError("bad_uuid")
+    stream = build_stream(stream_query(fields), "none")
+    if kind == "vless":
+        user = {"id": user_id, "encryption": text_field(fields, "encryption") or "none"}
+        if text_field(fields, "flow"):
+            user["flow"] = text_field(fields, "flow")
+    else:
+        try:
+            alter = int(text_field(fields, "alter") or 0)
+        except ValueError:
+            raise ParseError("bad_link")
+        user = {"id": user_id, "alterId": alter, "security": text_field(fields, "cipher") or "auto"}
+    outbound = {"protocol": kind, "settings": {"vnext": [{"address": address, "port": port, "users": [user]}]}, "streamSettings": stream}
+    return make_entry(kind, label, outbound=outbound)
+
+
+def stream_fields(outbound: dict) -> dict:
+    stream = outbound.get("streamSettings") or {}
+    network = stream.get("network") or "tcp"
+    security = stream.get("security") or "none"
+    out = {"network": network, "security": security}
+    tls = stream.get("tlsSettings") or {}
+    reality = stream.get("realitySettings") or {}
+    if security == "tls":
+        out.update(sni=tls.get("serverName") or "", fp=tls.get("fingerprint") or "", alpn=",".join(tls.get("alpn") or []), allow_insecure=bool(tls.get("allowInsecure")))
+    elif security == "reality":
+        out.update(sni=reality.get("serverName") or "", fp=reality.get("fingerprint") or "", pbk=reality.get("publicKey") or "", sid=reality.get("shortId") or "", spx=reality.get("spiderX") or "")
+    ws, grpc, upgrade, xhttp = (stream.get(k) or {} for k in ("wsSettings", "grpcSettings", "httpupgradeSettings", "xhttpSettings"))
+    if network == "ws":
+        out.update(path=ws.get("path") or "/", host_header=(ws.get("headers") or {}).get("Host", ""))
+    elif network == "grpc":
+        out.update(service=grpc.get("serviceName") or "", mode="multi" if grpc.get("multiMode") else "gun")
+    elif network == "httpupgrade":
+        out.update(path=upgrade.get("path") or "/", host_header=upgrade.get("host") or "")
+    elif network == "xhttp":
+        out.update(path=xhttp.get("path") or "/", host_header=xhttp.get("host") or "", mode=xhttp.get("mode") or "auto")
+    return out
+
+
+def entry_fields(entry: dict) -> dict:
+    kind, label = entry["type"], entry["label"]
+    if kind == "http":
+        parts = urlsplit(entry["url"])
+        return {"kind": "http", "label": label, "host": parts.hostname or "", "port": parts.port or "", "user": unquote(parts.username or ""), "password": unquote(parts.password or "")}
+    outbound = entry.get("outbound") or {}
+    settings = outbound.get("settings") or {}
+    if kind == "socks5":
+        server = (settings.get("servers") or [{}])[0]
+        user = (server.get("users") or [{}])[0]
+        return {"kind": "socks5", "label": label, "host": server.get("address", ""), "port": server.get("port", ""), "user": user.get("user", ""), "password": user.get("pass", "")}
+    if kind == "shadowsocks":
+        server = (settings.get("servers") or [{}])[0]
+        return {"kind": kind, "label": label, "host": server.get("address", ""), "port": server.get("port", ""), "method": server.get("method", ""), "password": server.get("password", "")}
+    if kind == "trojan":
+        server = (settings.get("servers") or [{}])[0]
+        return {"kind": kind, "label": label, "host": server.get("address", ""), "port": server.get("port", ""), "password": server.get("password", ""), **stream_fields(outbound)}
+    if kind in ("vless", "vmess"):
+        node = (settings.get("vnext") or [{}])[0]
+        user = (node.get("users") or [{}])[0]
+        base = {"kind": kind, "label": label, "host": node.get("address", ""), "port": node.get("port", ""), "id": user.get("id", ""), **stream_fields(outbound)}
+        if kind == "vless":
+            base.update(flow=user.get("flow", ""), encryption=user.get("encryption", "none"))
+        else:
+            base.update(alter=user.get("alterId", 0), cipher=user.get("security", "auto"))
+        return base
+    return {"kind": "xray", "label": label, "json": json.dumps(outbound, ensure_ascii=False, indent=2)}
+
+
+SING_KINDS = {"vless": "vless", "vmess": "vmess", "trojan": "trojan", "shadowsocks": "shadowsocks", "socks": "socks5", "http": "http"}
+
+
+def from_singbox(obj: dict) -> dict | None:
+    outbounds = obj.get("outbounds")
+    if not isinstance(outbounds, list):
+        return None
+    candidates = [o for o in outbounds if isinstance(o, dict) and o.get("type") in SING_KINDS and o.get("server")]
+    if not candidates:
+        return None
+    ob = next((o for o in candidates if o.get("tag") == "proxy"), candidates[0])
+    try:
+        port = int(ob.get("server_port"))
+    except (TypeError, ValueError):
+        raise ParseError("bad_link")
+    host = str(ob["server"])
+    tls = ob.get("tls") if isinstance(ob.get("tls"), dict) else {}
+    transport = ob.get("transport") if isinstance(ob.get("transport"), dict) else {}
+    reality = tls.get("reality") if isinstance(tls.get("reality"), dict) else {}
+    utls = tls.get("utls") if isinstance(tls.get("utls"), dict) else {}
+    headers = transport.get("headers") if isinstance(transport.get("headers"), dict) else {}
+    host_header = headers.get("Host") or transport.get("host") or ""
+    if isinstance(host_header, list):
+        host_header = host_header[0] if host_header else ""
+    security = "none"
+    if tls.get("enabled"):
+        security = "reality" if reality.get("enabled") else "tls"
+    q = {
+        "type": str(transport.get("type") or "tcp"), "security": security,
+        "sni": str(tls.get("server_name") or ""), "fp": str(utls.get("fingerprint") or ""),
+        "alpn": ",".join(tls.get("alpn") or []) if isinstance(tls.get("alpn"), list) else "",
+        "pbk": str(reality.get("public_key") or ""), "sid": str(reality.get("short_id") or ""),
+        "path": str(transport.get("path") or "/"), "host": str(host_header),
+        "serviceName": str(transport.get("service_name") or ""),
+    }
+    if tls.get("insecure"):
+        q["allowInsecure"] = "1"
+    kind = SING_KINDS[ob["type"]]
+    label = str(obj.get("remarks") or ob.get("tag") or "") if str(ob.get("tag") or "") not in ("proxy", "") else ""
+    label = label or f"{host}:{port}"
+    if kind == "http":
+        user, password = str(ob.get("username") or ""), str(ob.get("password") or "")
+        auth = f"{quote(user, safe='')}:{quote(password, safe='')}@" if user else ""
+        return make_entry("http", label, url=f"http://{auth}{host}:{port}")
+    if kind == "socks5":
+        server = {"address": host, "port": port}
+        if ob.get("username"):
+            server["users"] = [{"user": str(ob["username"]), "pass": str(ob.get("password") or "")}]
+        return make_entry("socks5", label, outbound={"protocol": "socks", "settings": {"servers": [server]}})
+    if kind == "shadowsocks":
+        server = {"address": host, "port": port, "method": str(ob.get("method") or ""), "password": str(ob.get("password") or "")}
+        return make_entry(kind, label, outbound={"protocol": "shadowsocks", "settings": {"servers": [server]}})
+    stream = build_stream(q, "none")
+    if kind == "trojan":
+        server = {"address": host, "port": port, "password": str(ob.get("password") or "")}
+        return make_entry(kind, label, outbound={"protocol": "trojan", "settings": {"servers": [server]}, "streamSettings": stream})
+    try:
+        user_id = str(uuid.UUID(str(ob.get("uuid") or "")))
+    except ValueError:
+        raise ParseError("bad_uuid")
+    if kind == "vless":
+        user = {"id": user_id, "encryption": "none"}
+        if ob.get("flow"):
+            user["flow"] = str(ob["flow"])
+    else:
+        user = {"id": user_id, "alterId": int(ob.get("alter_id") or 0), "security": str(ob.get("security") or "auto")}
+    return make_entry(kind, label, outbound={"protocol": kind, "settings": {"vnext": [{"address": host, "port": port, "users": [user]}]}, "streamSettings": stream})
+
+
+CHAT_PREFIX = re.compile(r"^\[\d{1,2}[./]\d{1,2}[./]\d{2,4}[^\]\n]*\][^:\n]{0,80}:[ \t]?", re.M)
+
+
+def scan_items(text: str) -> list[tuple[str, object]]:
+    text = CHAT_PREFIX.sub("", (text or "").lstrip("\ufeff"))
+    decoder, pos, items = json.JSONDecoder(), 0, []
+    while pos < len(text):
+        while pos < len(text) and (text[pos].isspace() or text[pos] == ","):
+            pos += 1
+        if pos >= len(text):
+            break
+        if text[pos] in "{[":
+            try:
+                obj, end = decoder.raw_decode(text, pos)
+                items.append(("json", obj))
+                pos = end
+                continue
+            except ValueError:
+                items.append(("badjson", None))
+        end = text.find("\n", pos)
+        end = len(text) if end < 0 else end
+        line = text[pos:end].strip()
+        pos = end + 1
+        if line and not line.startswith("#") and line[0] not in "{[":
+            items.append(("line", line))
+    return items
+
+
 def parse_config(obj) -> dict:
     if not isinstance(obj, dict):
         raise ParseError("bad_config")
@@ -167,12 +576,19 @@ def parse_config(obj) -> dict:
     if isinstance(obj.get("outbounds"), list):
         candidates = [o for o in obj["outbounds"] if isinstance(o, dict) and o.get("protocol") and o["protocol"] not in SKIP_PROTOCOLS]
         outbound = next((o for o in candidates if o.get("tag") == "proxy"), candidates[0] if candidates else None)
+        if outbound is None:
+            converted = from_singbox(obj)
+            if converted is not None:
+                return converted
     elif obj.get("protocol") and obj["protocol"] not in SKIP_PROTOCOLS:
         outbound = obj
     if outbound is None:
         raise ParseError("no_outbound")
     label = obj.get("remarks") if isinstance(obj.get("remarks"), str) and obj["remarks"].strip() else describe(outbound)
     return make_entry("xray", label.strip(), outbound=outbound, protocol=str(outbound["protocol"]))
+
+
+
 
 
 def parse_text(text: str) -> tuple[list[dict], list[dict]]:
@@ -249,36 +665,139 @@ def build_multi_config(entries: list[dict]) -> tuple[dict, dict]:
 
 def decode_subscription(body: str) -> str:
     text = (body or "").strip().lstrip("\ufeff")
-    if not text or text[0] in "{[" or "://" in text.splitlines()[0]:
-        return text
-    compact = re.sub(r"\s+", "", text).replace("-", "+").replace("_", "/")
+    for _ in range(3):
+        if not text or text[0] in "{[" or "://" in text[:4000]:
+            return text
+        compact = re.sub(r"\s+", "", text).replace("-", "+").replace("_", "/")
+        try:
+            raw = base64.b64decode(compact + "=" * (-len(compact) % 4)).decode("utf-8", errors="ignore").strip().lstrip("\ufeff")
+        except ValueError:
+            return text
+        if not raw:
+            return text
+        text = raw
+    return text
+
+
+
+
+
+def parse_input(text: str) -> tuple[list[dict], list[dict], list[tuple[int, str]]]:
+    items = scan_items(text)
+    if not items:
+        return [], [{"code": "empty", "n": 0}], []
+    entries, errors, subs = [], [], []
+    for n, (kind, value) in enumerate(items, 1):
+        try:
+            if kind == "badjson":
+                raise ParseError("bad_json")
+            if kind == "json":
+                for obj in value if isinstance(value, list) else [value]:
+                    entries.append(parse_config(obj))
+                continue
+            line = unwrap_link(value)
+            if is_sub_url(line):
+                subs.append((n, line))
+            else:
+                entries.append(parse_link(line))
+        except ParseError as e:
+            errors.append({"code": e.code, "n": n})
+    return entries, errors, subs
+
+
+class SubError(RuntimeError):
+    def __init__(self, code: str, detail: str = ""):
+        super().__init__(code)
+        self.code = code
+        self.detail = detail[:160]
+
+
+async def fetch_body(url: str, agent: str, via: str | None, hwid: str = "") -> str:
+    headers = {"Accept": "*/*"}
+    if agent:
+        headers["User-Agent"] = agent
+    if hwid and agent.startswith("Happ"):
+        headers.update({"x-hwid": hwid, "x-device-os": "Android", "x-ver-os": "14", "x-device-model": "Pixel 7"})
+    timeout = aiohttp.ClientTimeout(total=SUB_TIMEOUT, connect=8)
+    async with aiohttp.ClientSession(timeout=timeout, headers=headers, skip_auto_headers=() if agent else ("User-Agent",)) as session:
+        async with session.get(url, proxy=via) as resp:
+            if resp.status != 200:
+                raise RuntimeError(f"HTTP {resp.status}")
+            data = await resp.content.read(SUB_MAX_BYTES + 1)
+            if len(data) > SUB_MAX_BYTES:
+                raise SubError("sub_too_large")
+            return data.decode("utf-8", errors="replace")
+
+
+async def resolve_url(url: str, via: str | None = None) -> str:
+    if not url.lower().startswith("happ://crypt5/"):
+        return url
     try:
-        raw = base64.b64decode(compact + "=" * (-len(compact) % 4)).decode("utf-8", errors="ignore").strip()
-    except ValueError:
-        return text
-    return raw if raw and (raw[0] in "{[" or "://" in raw) else text
+        return await happ_crypt.resolve(url, via)
+    except happ_crypt.CryptError as e:
+        raise SubError(e.code)
+
+
+async def load_subscription(url: str, via: str | None = None, hwid: str = "") -> tuple[list[dict], int]:
+    url = await resolve_url(url, via)
+    last_code, last_detail = "sub_fetch_failed", ""
+    for route in ((None, via) if via else (None,)):
+        for agent in SUB_AGENTS:
+            try:
+                body = await fetch_body(url, agent, route, hwid)
+            except SubError as e:
+                last_code, last_detail = e.code, e.detail
+                break
+            except RuntimeError as e:
+                last_code, last_detail = "sub_fetch_failed", str(e)
+                continue
+            except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
+                last_code, last_detail = "sub_fetch_failed", type(e).__name__
+                break
+            head = body.lstrip()[:200].lower()
+            if head.startswith(("<!doctype", "<html")):
+                last_code, last_detail = "sub_html", ""
+                continue
+            entries, skipped = parse_subscription(body)
+            if entries:
+                return entries, skipped
+            last_code, last_detail = "sub_empty", f"skipped {skipped}"
+    raise SubError(last_code, last_detail)
+
+
+async def internet_up() -> bool:
+    async def one(host: str, port: int) -> bool:
+        try:
+            _, writer = await asyncio.wait_for(asyncio.open_connection(host, port), 3)
+            writer.close()
+            return True
+        except (OSError, asyncio.TimeoutError):
+            return False
+
+    pending = [asyncio.ensure_future(one(h, p)) for h, p in NET_PROBES]
+    try:
+        for done in asyncio.as_completed(pending):
+            if await done:
+                return True
+        return False
+    finally:
+        for task in pending:
+            task.cancel()
 
 
 def parse_subscription(body: str) -> tuple[list[dict], int]:
-    entries, errors = parse_text(decode_subscription(body))
+    text = decode_subscription(body)
+    if text[:1] in "{[":
+        entries, errors = parse_text(text)
+    else:
+        entries, errors = [], []
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip() and not ln.strip().startswith("#")]
+        for n, line in enumerate(lines, 1):
+            try:
+                entries.append(parse_link(line))
+            except ParseError as e:
+                errors.append({"code": e.code, "n": n})
     return entries, len([e for e in errors if e["code"] != "empty"])
-
-
-async def fetch_subscription(url: str, via: str | None = None) -> str:
-    last = "failed"
-    for proxy in ((None, via) if via else (None,)):
-        try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=25), headers={"User-Agent": SUB_UA}) as session:
-                async with session.get(url, proxy=proxy) as resp:
-                    if resp.status != 200:
-                        raise RuntimeError(f"HTTP {resp.status}")
-                    data = await resp.content.read(SUB_MAX_BYTES + 1)
-                    if len(data) > SUB_MAX_BYTES:
-                        raise RuntimeError("too large")
-                    return data.decode("utf-8", errors="replace")
-        except (aiohttp.ClientError, asyncio.TimeoutError, RuntimeError) as e:
-            last = str(e) or type(e).__name__
-    raise RuntimeError(last[:160])
 
 
 def asset_name() -> str | None:
@@ -410,6 +929,8 @@ class ProxyPool:
         self.dirty = False
         self.last_full = 0.0
         self.penalty: dict[str, float] = {}
+        self.checked = 0
+        self.internet = True
 
     def load(self) -> tuple[list[dict], list[dict]]:
         try:
@@ -451,6 +972,20 @@ class ProxyPool:
         self.save()
         return True
 
+    def replace(self, entry_id: str, fresh: dict) -> bool:
+        for index, entry in enumerate(self.entries):
+            if entry["id"] == entry_id:
+                fresh["id"] = entry_id
+                if entry.get("sub"):
+                    fresh["sub"] = entry["sub"]
+                self.entries[index] = fresh
+                self.status.pop(entry_id, None)
+                if self.active == entry_id:
+                    self.active, self.url = "", None
+                self.save()
+                return True
+        return False
+
     def set_subscription(self, url: str, entries: list[dict], sub_id: str | None = None) -> dict:
         sub = next((s for s in self.subs if s["id"] == sub_id), None)
         if sub is None:
@@ -484,9 +1019,10 @@ class ProxyPool:
             rows.append({
                 "id": entry["id"], "type": kind, "label": entry["label"], "sub": entry.get("sub", ""),
                 "active": entry["id"] == self.active, "status": self.status.get(entry["id"]),
+                "down": int(entry.get("down", 0)),
             })
         subs = [{"id": s["id"], "label": s["label"], "count": s.get("count", 0), "updated": s.get("updated", 0)} for s in self.subs]
-        return {"entries": rows, "subs": subs, "max": MAX_PROXIES, "binary": self.binary}
+        return {"entries": rows, "subs": subs, "max": MAX_PROXIES, "binary": self.binary, "checked": self.checked, "internet": self.internet, "limit": DOWN_LIMIT}
 
     def binary_path(self) -> str | None:
         for candidate in (os.environ.get("MRBEAST_XRAY"), shutil.which("xray"), str(BIN_DIR / "xray")):
@@ -528,23 +1064,39 @@ class ProxyPool:
         if entry is None:
             return
         self.status[entry_id] = {"ok": ok, "ms": ms, "error": error}
-        if ok and "down_since" in entry:
-            del entry["down_since"]
-            self.dirty = True
-        elif not ok and "down_since" not in entry:
-            entry["down_since"] = int(time.time())
+        if ok and ("down" in entry or "down_since" in entry):
+            entry.pop("down", None)
+            entry.pop("down_since", None)
             self.dirty = True
 
+    def account(self, entry: dict, ok: bool, now: float, internet: bool):
+        last = entry.get("seen") or now
+        entry["seen"] = int(now)
+        if ok:
+            entry.pop("down", None)
+            entry.pop("down_since", None)
+        elif internet:
+            entry["down"] = int(entry.get("down", 0) + min(max(0.0, now - last), CHECK_GAP_CAP))
+            entry.setdefault("down_since", int(now))
+        self.dirty = True
+
     def cleanup(self) -> int:
-        limit = time.time() - DOWN_LIMIT
-        keep = [e for e in self.entries if e["id"] == self.active or e.get("down_since", time.time()) > limit]
+        keep = [e for e in self.entries if e["id"] == self.active or e.get("down", 0) < DOWN_LIMIT]
         removed = len(self.entries) - len(keep)
         if removed:
+            gone = {e["id"] for e in self.entries} - {e["id"] for e in keep}
+            for entry_id in gone:
+                self.status.pop(entry_id, None)
             self.entries = keep
             self.dirty = True
         return removed
 
     async def probe_group(self, entries: list[dict]) -> dict:
+        if len(entries) > PROBE_CHUNK:
+            merged: dict = {}
+            for i in range(0, len(entries), PROBE_CHUNK):
+                merged.update(await self.probe_group(entries[i:i + PROBE_CHUNK]))
+            return merged
         binary = await self.ensure_binary()
         if not binary:
             return {e["id"]: (False, 0, "xray") for e in entries}
@@ -569,25 +1121,39 @@ class ProxyPool:
         finally:
             await self.prober.stop()
 
-    async def probe_all(self) -> dict:
+    async def probe_all(self, only_failed: bool = False) -> dict:
         async with self.probe_lock:
             results: dict = {}
             gate = asyncio.Semaphore(20)
+            targets = [
+                e for e in self.entries
+                if not only_failed or e["id"] != self.active and not (self.status.get(e["id"]) or {}).get("ok")
+            ]
 
             async def direct(entry):
                 async with gate:
                     results[entry["id"]] = await probe(entry["url"], PROBE_TIMEOUT)
 
-            plain = [e for e in self.entries if e["type"] == "http"]
-            other = [e for e in self.entries if e["type"] != "http"]
+            plain = [e for e in targets if e["type"] == "http"]
+            other = [e for e in targets if e["type"] != "http"]
 
             async def grouped():
                 if other:
                     results.update(await self.probe_group(other))
 
             await asyncio.gather(grouped(), *(direct(e) for e in plain))
+            failed = any(not r[0] for r in results.values())
+            self.internet = await internet_up() if failed else True
+            now = time.time()
+            by_id = {e["id"]: e for e in self.entries}
             for entry_id, (ok, ms, error) in results.items():
-                self.record(entry_id, ok, ms, error)
+                entry = by_id.get(entry_id)
+                if entry is None:
+                    continue
+                if ok or self.internet:
+                    self.record(entry_id, ok, ms, error)
+                self.account(entry, ok, now, self.internet)
+            self.checked = int(now)
             self.flush()
             return results
 
@@ -642,6 +1208,10 @@ class ProxyPool:
                 self.record(self.active, False, 0, "xray stopped")
                 return
             ok, ms, error = await probe(self.url)
+            if not ok and not await internet_up():
+                self.internet = False
+                continue
+            self.internet = True
             self.record(self.active, ok, ms, error)
             if not ok:
                 misses += 1
@@ -664,17 +1234,36 @@ class ProxyPool:
         self.active, self.url = "", None
         await self.xray.stop()
 
+    async def wait_recovery(self):
+        while True:
+            await asyncio.sleep(RECOVER_INTERVAL)
+            if not self.entries:
+                continue
+            try:
+                results = await self.probe_all()
+            except Exception as e:
+                logger.error(f"Background check failed: {e!r}")
+                continue
+            if any(r[0] for r in results.values()):
+                return
+
     async def maintain(self, stop: asyncio.Event):
+        delay = FIRST_CHECK_DELAY
         while True:
             try:
-                await asyncio.wait_for(stop.wait(), MAINTAIN_INTERVAL)
+                await asyncio.wait_for(stop.wait(), delay)
                 return
             except asyncio.TimeoutError:
                 pass
-            if self.entries:
-                await self.probe_all()
+            delay = MAINTAIN_INTERVAL
+            if not self.entries:
+                continue
+            try:
+                await self.probe_all(only_failed=bool(self.active))
                 if self.cleanup():
                     self.flush()
+            except Exception as e:
+                logger.error(f"Background check failed: {e!r}")
 
     async def stop(self):
         await self.release()

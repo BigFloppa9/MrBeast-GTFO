@@ -2,9 +2,14 @@ import re
 from datetime import timedelta
 
 from .config import (
+    DEFAULT_SETTINGS,
     MAX_DELETE_WINDOW_MINUTES,
     MAX_REASON_LENGTH,
+    MAX_STEPS,
     MAX_TIMEOUT_MINUTES,
+    PRESETS,
+    RETENTION_DAYS,
+    clean_step,
 )
 
 
@@ -87,6 +92,65 @@ def apply_patch(s: dict, patch: dict) -> list[str]:
             else:
                 new[field] = number
 
+    if "punish_preset" in patch:
+        if patch["punish_preset"] in PRESETS:
+            new["punish_preset"] = patch["punish_preset"]
+        else:
+            errors.append("preset_invalid")
+
+    if "custom_steps" in patch:
+        raw = patch["custom_steps"]
+        if not isinstance(raw, list) or len(raw) > MAX_STEPS:
+            errors.append("steps_invalid")
+        else:
+            steps = [clean_step(item) for item in raw]
+            if any(step is None for step in steps):
+                errors.append("steps_invalid")
+            else:
+                new["custom_steps"] = steps
+
+    if "warn_reset_days" in patch:
+        number = read_int(patch["warn_reset_days"], 1, RETENTION_DAYS)
+        if number is None:
+            errors.append("reset_days_range")
+        else:
+            new["warn_reset_days"] = number
+
+    if "dm_reason" in patch:
+        if isinstance(patch["dm_reason"], bool):
+            new["dm_reason"] = patch["dm_reason"]
+        else:
+            errors.append("dm_reason_invalid")
+
+    if not errors:
+        preset = new.get("punish_preset", s.get("punish_preset", "default"))
+        steps = new.get("custom_steps", s.get("custom_steps") or [])
+        if preset == "custom" and not steps:
+            errors.append("steps_empty")
+
     if not errors:
         s.update(new)
     return errors
+
+
+def sanitize_settings(raw) -> dict:
+    trial = dict(DEFAULT_SETTINGS, custom_steps=[])
+    if not isinstance(raw, dict):
+        return trial
+    patches = []
+    if isinstance(raw.get("timeout_duration"), int):
+        patches.append({"timeout": fmt_duration(raw["timeout_duration"])})
+    if isinstance(raw.get("delete_window"), int):
+        patches.append({"delete_window": fmt_duration(raw["delete_window"])})
+    for key in ("timeout_reason", "auto_min_images", "auto_min_channels", "auto_window_seconds", "warn_reset_days", "dm_reason", "custom_steps"):
+        if key in raw:
+            patches.append({key: raw[key]})
+    if "punish_preset" in raw:
+        patches.append({"punish_preset": raw["punish_preset"]})
+    for patch in patches:
+        probe = dict(trial)
+        if not apply_patch(probe, patch):
+            trial = probe
+    if isinstance(raw.get("log_channel"), int) and raw["log_channel"] >= 0:
+        trial["log_channel"] = raw["log_channel"]
+    return trial

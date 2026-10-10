@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import logging
+import re
 import secrets
 import string
 import time
@@ -19,6 +20,15 @@ CODE_LENGTH = 6
 CODE_TTL = 600
 CODE_MAX_ATTEMPTS = 5
 SESSION_TTL = 12 * 3600
+ANSWER_ITERATIONS = 200_000
+MAX_QUESTIONS = 3
+MAX_HINT = 200
+QUESTION_IDS = ("pet", "city", "game", "friend", "phone", "movie", "street", "custom")
+ANSWER_RE = re.compile(r"^[a-z0-9_.-]{2,64}$")
+
+
+def normalize_answer(text) -> str:
+    return re.sub(r"\s+", "_", str(text or "").strip().lower())
 
 
 def generate_code() -> str:
@@ -81,6 +91,58 @@ class AuthStore:
         except (KeyError, ValueError):
             return False
         return hmac.compare_digest(hash_password(password, salt, iterations), expected)
+
+
+class RecoveryMixin:
+    def recovery_questions(self) -> list[dict]:
+        items = self.data.get("recovery")
+        return items if isinstance(items, list) else []
+
+    def recovery_view(self) -> dict:
+        return {
+            "questions": [{"id": q.get("id", "custom"), "text": q.get("text", "")} for q in self.recovery_questions()],
+            "hint": str(self.data.get("hint") or ""),
+        }
+
+    def set_recovery(self, questions: list[dict], hint: str) -> str | None:
+        if len(questions) > MAX_QUESTIONS:
+            return "questions_many"
+        if len(hint) > MAX_HINT:
+            return "hint_long"
+        stored = []
+        for item in questions:
+            qid = item.get("id") if item.get("id") in QUESTION_IDS else "custom"
+            text = str(item.get("text") or "").strip()[:120]
+            answer = normalize_answer(item.get("answer"))
+            if qid == "custom" and not text:
+                return "question_empty"
+            if not ANSWER_RE.match(answer):
+                return "answer_invalid"
+            salt = secrets.token_bytes(16)
+            digest = hashlib.pbkdf2_hmac("sha256", answer.encode("ascii"), salt, ANSWER_ITERATIONS)
+            stored.append({
+                "id": qid, "text": text,
+                "salt": base64.b64encode(salt).decode("ascii"), "hash": base64.b64encode(digest).decode("ascii"),
+            })
+        self.data["recovery"] = stored
+        self.data["hint"] = hint.strip()
+        self.save()
+        return None
+
+    def verify_answers(self, answers: list) -> bool:
+        stored = self.recovery_questions()
+        if not stored or not isinstance(answers, list) or len(answers) != len(stored):
+            return False
+        good = True
+        for item, given in zip(stored, answers):
+            try:
+                salt, expected = base64.b64decode(item["salt"]), base64.b64decode(item["hash"])
+            except (KeyError, ValueError):
+                return False
+            value = normalize_answer(given)
+            digest = hashlib.pbkdf2_hmac("sha256", value.encode("utf-8", "ignore"), salt, ANSWER_ITERATIONS)
+            good = hmac.compare_digest(digest, expected) and good
+        return good
 
 
 class Sessions:
@@ -154,6 +216,11 @@ class OneTimeCode:
 
 
 class ResetFlow:
+    def grant(self) -> str:
+        token = secrets.token_urlsafe(24)
+        self.tokens[token] = time.time() + CODE_TTL
+        return token
+
     def __init__(self):
         self.code = OneTimeCode()
         self.open_until = 0.0
@@ -205,3 +272,10 @@ class LoginLimiter:
 
     def reset(self, key: str):
         self.failures.pop(key, None)
+
+    def count(self, key: str) -> int:
+        return self.failures.get(key, (0, 0.0))[0]
+
+
+for _name in ("recovery_questions", "recovery_view", "set_recovery", "verify_answers"):
+    setattr(AuthStore, _name, getattr(RecoveryMixin, _name))

@@ -30,12 +30,13 @@ const I18N = {
     "forgot.save": "Save new password",
     "forgot.done": "Password changed. Sign in with the new password.",
     "forgot.back": "Back to sign in",
-    "nav.logs": "Logs",
+    "nav.logs": "Offenders",
     "nav.status": "Status",
     "nav.servers": "Servers",
+    "nav.proxy": "Proxy",
     "nav.settings": "Settings",
     "nav.logout": "Sign out",
-    "logs.title": "Logs",
+    "logs.title": "Offenders",
     "logs.empty": "No actions yet. Logs appear here when the bot takes action.",
     "log.auto": "🚨 MrBeast (Auto)",
     "log.manual": "🚨 MrBeast (Manual)",
@@ -108,20 +109,20 @@ const I18N = {
     "net.vpn": "VPN",
     "net.mobile": "mobile data",
     "net.other": "other",
-    "proxy.sub_title": "Subscription",
-    "proxy.sub_hint": "Paste a subscription link: the bot reads the servers from it and adds them. Update it when the provider changes the list.",
-    "proxy.sub_add": "Add subscription",
     "proxy.sub_update": "Update",
     "proxy.sub_count": "{n} servers",
-    "proxy.sub_added": "Subscription added: {n} servers.",
     "proxy.sub_updated": "Subscription updated: {n} servers.",
-    "proxy.sub_placeholder": "https://example.com/sub/…",
-    "proxy.title": "Proxy",
-    "proxy.hint": "Use this if Discord is blocked at your provider. Paste proxy links or a full Xray/V2Ray config, one link per line: socks5://user:pass@host:port, http://host:port, vless://… or a JSON config. Up to {max} entries. The bot checks them all, connects to the fastest one and re-selects when it fails or gets slower than 1000 ms; if none works, it connects directly. Servers that stay offline for over a day are removed.",
-    "proxy.placeholder": "socks5://127.0.0.1:2080\nhttp://127.0.0.1:10809\nvless://uuid@host:443?type=tcp&security=reality&…\n{ JSON config }",
+    "proxy.hint": "Needed if Discord is blocked by your provider. Paste proxy links (socks5, http, vless, vmess, trojan, ss), a JSON config or a subscription link (https://…), one per line. Up to {max} entries.",
+    "proxy.placeholder": "socks5://127.0.0.1:2080\nvless://uuid@host:443?type=tcp&security=reality&…\nhttps://example.com/sub/…\n{ JSON config }",
     "proxy.add": "Add",
     "proxy.empty": "No proxies added. The bot connects directly.",
     "proxy.count": "{n} / {max}",
+    "proxy.checked": "Last check: {t}",
+    "proxy.never": "not yet",
+    "proxy.no_internet": "No internet on this device right now, so servers are not marked as failed.",
+    "proxy.down_for": "offline {h} h of {limit} h",
+    "proxy.ago_min": "{n} min ago",
+    "proxy.ago_now": "just now",
     "proxy.active": "in use",
     "proxy.ok": "works",
     "proxy.failed": "not working",
@@ -151,6 +152,11 @@ const I18N = {
     "err.sub_invalid": "Enter a link starting with http:// or https://.",
     "err.sub_fetch_failed": "Couldn't download the subscription.",
     "err.sub_empty": "No supported servers found in the subscription.",
+    "err.crypt_unsupported": "only happ://crypt5 links are supported (older crypt, crypt2–4 are not)",
+    "err.sub_html": "The link returned a web page instead of a subscription (the provider may block bots or require a login).",
+    "err.sub_too_large": "The subscription is too large.",
+    "err.sub_truncated": "The limit is reached, servers not added",
+    "err.unsupported_plugin": "shadowsocks plugins are not supported",
     "err.not_git": "This installation is not a git checkout (or git is missing), so it can't be updated here.",
     "err.fetch_failed": "Couldn't reach GitHub to check for updates.",
     "err.update_running": "An update is already running.",
@@ -160,7 +166,7 @@ const I18N = {
     "servers.offline": "The bot is offline, so server settings can't be loaded.",
     "servers.none": "The bot is not on any server yet.",
     "servers.reason": "Timeout reason",
-    "servers.reason_hint": "Shown to the user in the audit log. Leave empty to use the default text.",
+    "servers.reason_hint": "The user the bot punished will see this reason (the bot sends it in a direct message). It is also written to the server's audit log. Leave empty to use the default text.",
     "servers.timeout": "Timeout duration",
     "servers.timeout_hint": "Examples: 1d, 12h, 30m, 1d12h. Maximum 28d.",
     "servers.delete": "Delete messages from the last",
@@ -184,9 +190,9 @@ const I18N = {
     "settings.new_token": "New bot token",
     "settings.token_save": "Replace token",
     "settings.token_done": "Token replaced. The bot is restarting.",
-    "settings.moderator": "Moderator account",
+    "settings.moderator": "Moderator accounts",
     "settings.mod_linked": "Linked account: {name}",
-    "settings.mod_none": "No account is linked. A linked account is needed to reset the panel password through Discord.",
+    "settings.mod_none": "No Discord account is linked yet. A linked account can reset the panel password with /log.",
     "settings.mod_generate": "Generate code",
     "settings.mod_s1": "Send the bot the command",
     "settings.mod_s2": "in",
@@ -220,7 +226,160 @@ const I18N = {
     "err.channel_invalid": "This channel can't be used for logs.",
     "err.log_missing_perms": "The bot lacks permissions in this channel: {missing}.",
     "err.guild_unavailable": "Server unavailable. Is the bot online?",
-    "err.lang_invalid": "Unsupported language."
+    "err.lang_invalid": "Unsupported language.",
+    "net.title_one": "Panel address",
+    "net.title_many": "Panel addresses",
+    "status.console": "Latest log",
+    "status.console_empty": "No lines yet.",
+    "confirm.yes": "Yes",
+    "confirm.no": "No",
+    "confirm.pause": "Pause the bot?",
+    "confirm.stop": "Stop the bot?",
+    "confirm.proxy_remove": "Remove this proxy from the list?",
+    "confirm.sub_remove": "Remove this subscription and all of its servers?",
+    "confirm.moderator_remove": "Unlink this moderator account?",
+    "confirm.erase": "Erase this user's data everywhere? This can't be undone.",
+    "servers.search": "Search servers",
+    "servers.all": "Servers",
+    "servers.search_results": "Search results",
+    "servers.nothing": "Nothing found",
+    "servers.dm_reason": "Also send the reason to the user in a direct message",
+    "servers.punish": "Punishment",
+    "servers.punish_hint": "What the bot does after detecting a compromised account. Repeated detections of the same user on this server move through the steps below.",
+    "servers.reset_days": "Reset detections after (days)",
+    "servers.reset_days_hint": "The counter of a user is cleared after this many days without new detections (1–90). Nothing is kept longer than 90 days.",
+    "preset.default": "One action (as before)",
+    "preset.ladder": "Escalation: 4 detections, ends with a ban",
+    "preset.ladder_ban": "Ban at the first detection",
+    "preset.custom": "Custom",
+    "step.n": "Step {n}",
+    "step.action": "Action",
+    "step.timeout": "Timeout",
+    "step.ban": "Ban",
+    "step.duration": "Timeout length",
+    "step.delete": "Delete messages from the last",
+    "step.reason": "Reason (empty = default text)",
+    "step.add": "Add step",
+    "step.remove": "Remove step",
+    "step.line_timeout": "Timeout {d}, delete messages from the last {w}",
+    "step.line_ban": "Ban, delete messages from the last {w}",
+    "step.invalid": "Step {n}: check the values (timeout 1m–28d, deleting up to 7d for a ban).",
+    "step.custom_note": "Steps run in order for each new detection of the same user. After the last step it repeats.",
+    "err.preset_invalid": "Unknown punishment preset.",
+    "err.steps_invalid": "Some step has invalid values.",
+    "err.steps_empty": "Add at least one step for the custom preset.",
+    "err.reset_days_range": "Days must be between 1 and 90.",
+    "err.dm_reason_invalid": "Invalid value.",
+    "proxy.edit": "Edit",
+    "proxy.form": "Add via form",
+    "proxy.dialog_add": "New proxy",
+    "proxy.dialog_edit": "Edit proxy",
+    "proxy.cancel": "Cancel",
+    "proxy.save": "Save",
+    "proxy.socket": "Server address",
+    "proxy.account": "Credentials (optional)",
+    "proxy.f.label": "Name",
+    "proxy.f.host": "Host",
+    "proxy.f.port": "Port",
+    "proxy.f.user": "Login",
+    "proxy.f.password": "Password",
+    "proxy.f.id": "UUID",
+    "proxy.f.flow": "Flow",
+    "proxy.f.encryption": "Encryption",
+    "proxy.f.network": "Transport",
+    "proxy.f.security": "Security",
+    "proxy.f.sni": "SNI",
+    "proxy.f.fp": "Fingerprint",
+    "proxy.f.alpn": "ALPN (comma separated)",
+    "proxy.f.allow_insecure": "Allow insecure certificate",
+    "proxy.f.pbk": "Public key (pbk)",
+    "proxy.f.sid": "Short ID (sid)",
+    "proxy.f.spx": "SpiderX (spx)",
+    "proxy.f.path": "Path",
+    "proxy.f.host_header": "Host header",
+    "proxy.f.service": "gRPC service name",
+    "proxy.f.mode": "Mode",
+    "proxy.f.alter": "Alter ID",
+    "proxy.f.cipher": "Cipher",
+    "proxy.f.method": "Method",
+    "proxy.f.json": "Xray outbound (JSON)",
+    "proxy.kind.socks5": "SOCKS5",
+    "proxy.kind.http": "HTTP",
+    "proxy.kind.vless": "VLESS",
+    "proxy.kind.vmess": "VMess",
+    "proxy.kind.trojan": "Trojan",
+    "proxy.kind.shadowsocks": "Shadowsocks",
+    "proxy.kind.xray": "JSON (Xray)",
+    "proxy.mt_note": "MTProto and web proxies work only inside Telegram and can't carry Discord traffic, so they are not offered here. tg://socks links are accepted.",
+    "err.bad_port": "the port must be between 1 and 65535",
+    "err.mtproto_unsupported": "Telegram MTProto proxies can't carry Discord traffic (a tg://socks link works)",
+    "err.crypt_failed": "the happ://crypt link could not be decrypted",
+    "err.crypt_keys_unavailable": "the key list for happ://crypt5 could not be downloaded (github.com/cylaro/happ-decrypt)",
+    "err.crypt_unknown_key": "this happ://crypt5 link uses a key that is not in the list",
+    "settings.mod_remove": "Unlink",
+    "security.title": "Password recovery",
+    "security.lead": "If you forget the panel password you can restore access through a linked Discord account (/log) or by answering your security questions. Answers are stored only as hashes.",
+    "security.none": "No security questions set.",
+    "security.q_n": "Question {n}",
+    "security.q_custom": "Your own question",
+    "security.q.pet": "Name of your first pet",
+    "security.q.city": "City where you were born",
+    "security.q.game": "Your favorite game",
+    "security.q.friend": "Nickname of your best friend",
+    "security.q.phone": "Model of your first phone",
+    "security.q.movie": "Your favorite movie",
+    "security.q.street": "Street you grew up on",
+    "security.question_text": "Your question",
+    "security.answer": "Answer",
+    "security.answer_hint": "Latin letters and digits only, no spaces (use _), preferably one word.",
+    "security.add": "Add question",
+    "security.hint": "Password hint",
+    "security.hint_hint": "Shown under the password field after 2 wrong attempts. Don't write the password itself.",
+    "security.save": "Save",
+    "security.saved": "Saved.",
+    "security.fill": "Enter your current password and an answer for every question to save.",
+    "err.answers_invalid": "The answers are wrong.",
+    "err.answer_invalid": "Answers must use Latin letters, digits, _ . - only (2–64 characters).",
+    "err.question_empty": "Write the text of your own question.",
+    "err.questions_many": "At most 3 questions.",
+    "err.hint_long": "The hint is too long.",
+    "login.hint": "Hint: {h}",
+    "forgot.questions_title": "Answer your security questions",
+    "forgot.questions_submit": "Check answers",
+    "forgot.or": "or",
+    "forgot.no_method": "No recovery method was set up for this panel: no linked Discord account and no security questions. Sorry, good luck: remove the bot and reinstall it with the command below on the device where it runs ({env}). This deletes all bot data.",
+    "forgot.env_termux": "Termux",
+    "forgot.env_other": "this device",
+    "forgot.copy": "Copy command",
+    "forgot.copied": "Copied.",
+    "console.title": "Console log",
+    "console.hint": "The last {n} lines. Older lines are overwritten. You can export the log and share it when something goes wrong.",
+    "console.empty": "No lines yet.",
+    "console.refresh": "Refresh",
+    "console.export": "Export",
+    "console.scope_all": "Everything stored",
+    "console.scope_session": "Since the last bot start",
+    "data.title": "Transfer settings",
+    "data.hint": "Saves server settings, punishment presets, reasons and detection counters to a file. User IDs in the counters are encrypted with the passphrase. Offenders and logs are not included. Anything older than 90 days is dropped on import.",
+    "data.passphrase": "Passphrase",
+    "data.export": "Export",
+    "data.import": "Import",
+    "data.file": "Export file",
+    "data.imported": "Imported: {g} servers, {n} counters.",
+    "data.choose": "Choose a file first.",
+    "err.passphrase_short": "The passphrase must be at least 6 characters.",
+    "err.import_invalid": "This file is not a valid export.",
+    "err.import_passphrase": "Wrong passphrase or damaged file.",
+    "privacy.discord": "Log messages deleted in Discord: {n}.",
+    "privacy.discord_skipped": "The bot is offline, so Discord log channels were not checked.",
+    "privacy.discord_only": "No stored records, but the log channels in Discord will still be checked.",
+    "update.label": "Version",
+    "update.show": "Show changes",
+    "update.hide": "Hide changes",
+    "update.no_git": "The change list needs a git installation.",
+    "log.ban": "Ban",
+    "log.strike": "Detection {n} of {total}",
+    "log.deleted_ban": "Messages deleted by the ban (last {w})"
   },
   ru: {
     "setup.title": "Настройка MrBeast GTFO",
@@ -251,12 +410,13 @@ const I18N = {
     "forgot.save": "Сохранить новый пароль",
     "forgot.done": "Пароль изменён. Войдите с новым паролем.",
     "forgot.back": "Назад ко входу",
-    "nav.logs": "Логи",
+    "nav.logs": "Нарушители",
     "nav.status": "Статус",
     "nav.servers": "Серверы",
+    "nav.proxy": "Прокси",
     "nav.settings": "Настройки",
     "nav.logout": "Выйти",
-    "logs.title": "Логи",
+    "logs.title": "Нарушители",
     "logs.empty": "Пока действий нет. Логи появятся здесь, когда бот сработает.",
     "log.auto": "🚨 MrBeast (Авто)",
     "log.manual": "🚨 MrBeast (Вручную)",
@@ -329,20 +489,20 @@ const I18N = {
     "net.vpn": "VPN",
     "net.mobile": "мобильная сеть",
     "net.other": "другое",
-    "proxy.sub_title": "Подписка",
-    "proxy.sub_hint": "Вставьте ссылку на подписку: бот прочитает из неё серверы и добавит их. Обновляйте, когда провайдер меняет список.",
-    "proxy.sub_add": "Добавить подписку",
     "proxy.sub_update": "Обновить",
     "proxy.sub_count": "Серверов: {n}",
-    "proxy.sub_added": "Подписка добавлена: серверов {n}.",
     "proxy.sub_updated": "Подписка обновлена: серверов {n}.",
-    "proxy.sub_placeholder": "https://example.com/sub/…",
-    "proxy.title": "Прокси",
-    "proxy.hint": "Нужно, если Discord заблокирован у вашего провайдера. Вставьте ссылки на прокси или полный конфиг Xray/V2Ray, по одной ссылке в строке: socks5://user:pass@host:port, http://host:port, vless://… или JSON-конфиг. До {max} записей. Бот проверяет все, подключается к самой быстрой и выбирает заново, если она отказала или стала медленнее 1000 мс; если не работает ни одна, подключается напрямую. Серверы, которые не отвечают больше суток, удаляются.",
-    "proxy.placeholder": "socks5://127.0.0.1:2080\nhttp://127.0.0.1:10809\nvless://uuid@host:443?type=tcp&security=reality&…\n{ JSON-конфиг }",
+    "proxy.hint": "Нужно, если Discord заблокирован у провайдера. Вставьте ссылки на прокси (socks5, http, vless, vmess, trojan, ss), JSON-конфиг или ссылку на подписку (https://…), по одной в строке. До {max} записей.",
+    "proxy.placeholder": "socks5://127.0.0.1:2080\nvless://uuid@host:443?type=tcp&security=reality&…\nhttps://example.com/sub/…\n{ JSON-конфиг }",
     "proxy.add": "Добавить",
     "proxy.empty": "Прокси не добавлены. Бот подключается напрямую.",
     "proxy.count": "{n} / {max}",
+    "proxy.checked": "Последняя проверка: {t}",
+    "proxy.never": "ещё не было",
+    "proxy.no_internet": "Сейчас на устройстве нет интернета, поэтому серверы не помечаются как нерабочие.",
+    "proxy.down_for": "не отвечает {h} ч из {limit} ч",
+    "proxy.ago_min": "{n} мин назад",
+    "proxy.ago_now": "только что",
     "proxy.active": "используется",
     "proxy.ok": "работает",
     "proxy.failed": "не работает",
@@ -372,6 +532,11 @@ const I18N = {
     "err.sub_invalid": "Введите ссылку, начинающуюся с http:// или https://.",
     "err.sub_fetch_failed": "Не удалось загрузить подписку.",
     "err.sub_empty": "В подписке не найдено поддерживаемых серверов.",
+    "err.crypt_unsupported": "поддерживаются только ссылки happ://crypt5 (старые crypt, crypt2–4 нет)",
+    "err.sub_html": "По ссылке открылась веб-страница, а не подписка (провайдер может блокировать ботов или требовать вход).",
+    "err.sub_too_large": "Подписка слишком большая.",
+    "err.sub_truncated": "Достигнут лимит, серверы не добавлены",
+    "err.unsupported_plugin": "плагины shadowsocks не поддерживаются",
     "err.not_git": "Эта установка не является git-копией (или не установлен git), обновить её отсюда нельзя.",
     "err.fetch_failed": "Не удалось связаться с GitHub для проверки обновлений.",
     "err.update_running": "Обновление уже выполняется.",
@@ -381,7 +546,7 @@ const I18N = {
     "servers.offline": "Бот не в сети, поэтому настройки серверов недоступны.",
     "servers.none": "Бот пока не добавлен ни на один сервер.",
     "servers.reason": "Причина таймаута",
-    "servers.reason_hint": "Показывается пользователю в журнале аудита. Оставьте пустым, чтобы использовать текст по умолчанию.",
+    "servers.reason_hint": "Эту причину увидит пользователь, которого наказал бот (бот отправит её в личные сообщения). Она также записывается в журнал аудита сервера. Оставьте пустым, чтобы использовать текст по умолчанию.",
     "servers.timeout": "Длительность таймаута",
     "servers.timeout_hint": "Примеры: 1d, 12h, 30m, 1d12h. Максимум 28d.",
     "servers.delete": "Удалять сообщения за последние",
@@ -405,9 +570,9 @@ const I18N = {
     "settings.new_token": "Новый токен бота",
     "settings.token_save": "Заменить токен",
     "settings.token_done": "Токен заменён. Бот перезапускается.",
-    "settings.moderator": "Аккаунт модератора",
+    "settings.moderator": "Аккаунты модераторов",
     "settings.mod_linked": "Привязан аккаунт: {name}",
-    "settings.mod_none": "Аккаунт не привязан. Он нужен, чтобы сбросить пароль панели через Discord.",
+    "settings.mod_none": "Аккаунты Discord пока не привязаны. Привязанный аккаунт может сбросить пароль панели командой /log.",
     "settings.mod_generate": "Сгенерировать код",
     "settings.mod_s1": "Отправьте боту команду",
     "settings.mod_s2": "в",
@@ -441,7 +606,160 @@ const I18N = {
     "err.channel_invalid": "Этот канал нельзя использовать для логов.",
     "err.log_missing_perms": "У бота не хватает прав в этом канале: {missing}.",
     "err.guild_unavailable": "Сервер недоступен. Бот в сети?",
-    "err.lang_invalid": "Язык не поддерживается."
+    "err.lang_invalid": "Язык не поддерживается.",
+    "net.title_one": "Адрес панели",
+    "net.title_many": "Адреса панели",
+    "status.console": "Последние логи",
+    "status.console_empty": "Пока нет строк.",
+    "confirm.yes": "Да",
+    "confirm.no": "Нет",
+    "confirm.pause": "Поставить бота на паузу?",
+    "confirm.stop": "Остановить бота?",
+    "confirm.proxy_remove": "Удалить этот прокси из списка?",
+    "confirm.sub_remove": "Удалить подписку и все её серверы?",
+    "confirm.moderator_remove": "Отвязать этот аккаунт модератора?",
+    "confirm.erase": "Стереть данные этого пользователя везде? Это нельзя отменить.",
+    "servers.search": "Поиск серверов",
+    "servers.all": "Серверы",
+    "servers.search_results": "Результаты поиска",
+    "servers.nothing": "Ничего не найдено",
+    "servers.dm_reason": "Также отправлять причину пользователю в личные сообщения",
+    "servers.punish": "Наказание",
+    "servers.punish_hint": "Что бот делает после обнаружения взломанного аккаунта. Повторные обнаружения того же пользователя на этом сервере проходят по шагам ниже.",
+    "servers.reset_days": "Сбрасывать обнаружения через (дней)",
+    "servers.reset_days_hint": "Счётчик пользователя очищается, если столько дней не было новых обнаружений (1–90). Дольше 90 дней ничего не хранится.",
+    "preset.default": "Одно действие (как раньше)",
+    "preset.ladder": "Нарастающее: 4 обнаружения, в конце бан",
+    "preset.ladder_ban": "Бан при первом обнаружении",
+    "preset.custom": "Свой",
+    "step.n": "Шаг {n}",
+    "step.action": "Действие",
+    "step.timeout": "Тайм-аут",
+    "step.ban": "Бан",
+    "step.duration": "Длительность тайм-аута",
+    "step.delete": "Удалить сообщения за последние",
+    "step.reason": "Причина (пусто = текст по умолчанию)",
+    "step.add": "Добавить шаг",
+    "step.remove": "Удалить шаг",
+    "step.line_timeout": "Тайм-аут {d}, удаление сообщений за {w}",
+    "step.line_ban": "Бан, удаление сообщений за {w}",
+    "step.invalid": "Шаг {n}: проверьте значения (тайм-аут 1m–28d, при бане удаление до 7d).",
+    "step.custom_note": "Шаги выполняются по порядку при каждом новом обнаружении того же пользователя. После последнего шага он повторяется.",
+    "err.preset_invalid": "Неизвестный пресет наказания.",
+    "err.steps_invalid": "В каком-то шаге неверные значения.",
+    "err.steps_empty": "Добавьте хотя бы один шаг для своего пресета.",
+    "err.reset_days_range": "Дней должно быть от 1 до 90.",
+    "err.dm_reason_invalid": "Неверное значение.",
+    "proxy.edit": "Изменить",
+    "proxy.form": "Добавить через форму",
+    "proxy.dialog_add": "Новый прокси",
+    "proxy.dialog_edit": "Редактирование прокси",
+    "proxy.cancel": "Отмена",
+    "proxy.save": "Сохранить",
+    "proxy.socket": "Адрес сервера",
+    "proxy.account": "Учётные данные (необязательно)",
+    "proxy.f.label": "Название",
+    "proxy.f.host": "Хост",
+    "proxy.f.port": "Порт",
+    "proxy.f.user": "Логин",
+    "proxy.f.password": "Пароль",
+    "proxy.f.id": "UUID",
+    "proxy.f.flow": "Flow",
+    "proxy.f.encryption": "Шифрование",
+    "proxy.f.network": "Транспорт",
+    "proxy.f.security": "Защита",
+    "proxy.f.sni": "SNI",
+    "proxy.f.fp": "Отпечаток (fingerprint)",
+    "proxy.f.alpn": "ALPN (через запятую)",
+    "proxy.f.allow_insecure": "Разрешить небезопасный сертификат",
+    "proxy.f.pbk": "Публичный ключ (pbk)",
+    "proxy.f.sid": "Short ID (sid)",
+    "proxy.f.spx": "SpiderX (spx)",
+    "proxy.f.path": "Путь",
+    "proxy.f.host_header": "Заголовок Host",
+    "proxy.f.service": "Имя сервиса gRPC",
+    "proxy.f.mode": "Режим",
+    "proxy.f.alter": "Alter ID",
+    "proxy.f.cipher": "Шифр",
+    "proxy.f.method": "Метод",
+    "proxy.f.json": "Исходящее Xray (JSON)",
+    "proxy.kind.socks5": "SOCKS5",
+    "proxy.kind.http": "HTTP",
+    "proxy.kind.vless": "VLESS",
+    "proxy.kind.vmess": "VMess",
+    "proxy.kind.trojan": "Trojan",
+    "proxy.kind.shadowsocks": "Shadowsocks",
+    "proxy.kind.xray": "JSON (Xray)",
+    "proxy.mt_note": "MTProto и веб-прокси работают только внутри Telegram и не могут передавать трафик Discord, поэтому их здесь нет. Ссылки tg://socks принимаются.",
+    "err.bad_port": "порт должен быть от 1 до 65535",
+    "err.mtproto_unsupported": "прокси Telegram MTProto не передают трафик Discord (ссылка tg://socks подойдёт)",
+    "err.crypt_failed": "ссылку happ://crypt не удалось расшифровать",
+    "err.crypt_keys_unavailable": "не удалось скачать список ключей для happ://crypt5 (github.com/cylaro/happ-decrypt)",
+    "err.crypt_unknown_key": "эта ссылка happ://crypt5 использует ключ, которого нет в списке",
+    "settings.mod_remove": "Отвязать",
+    "security.title": "Восстановление пароля",
+    "security.lead": "Если забудете пароль панели, доступ можно вернуть через привязанный аккаунт Discord (/log) или ответами на контрольные вопросы. Ответы хранятся только в виде хешей.",
+    "security.none": "Контрольные вопросы не заданы.",
+    "security.q_n": "Вопрос {n}",
+    "security.q_custom": "Свой вопрос",
+    "security.q.pet": "Кличка первого питомца",
+    "security.q.city": "Город, где вы родились",
+    "security.q.game": "Любимая игра",
+    "security.q.friend": "Ник лучшего друга",
+    "security.q.phone": "Модель первого телефона",
+    "security.q.movie": "Любимый фильм",
+    "security.q.street": "Улица, на которой вы выросли",
+    "security.question_text": "Ваш вопрос",
+    "security.answer": "Ответ",
+    "security.answer_hint": "Только латиница и цифры, без пробелов (используйте _), лучше одним словом.",
+    "security.add": "Добавить вопрос",
+    "security.hint": "Подсказка к паролю",
+    "security.hint_hint": "Показывается под полем пароля после 2 неверных попыток. Не пишите сам пароль.",
+    "security.save": "Сохранить",
+    "security.saved": "Сохранено.",
+    "security.fill": "Для сохранения введите текущий пароль и ответ на каждый вопрос.",
+    "err.answers_invalid": "Ответы неверные.",
+    "err.answer_invalid": "Ответ: только латиница, цифры и символы _ . - (2–64 символа).",
+    "err.question_empty": "Напишите текст своего вопроса.",
+    "err.questions_many": "Не больше 3 вопросов.",
+    "err.hint_long": "Подсказка слишком длинная.",
+    "login.hint": "Подсказка: {h}",
+    "forgot.questions_title": "Ответьте на контрольные вопросы",
+    "forgot.questions_submit": "Проверить ответы",
+    "forgot.or": "или",
+    "forgot.no_method": "Для этой панели не настроен ни один способ восстановления: нет привязанного аккаунта Discord и нет контрольных вопросов. К сожалению, удачи: удалите бота и установите заново командой ниже на устройстве, где он запущен ({env}). Все данные бота будут удалены.",
+    "forgot.env_termux": "Termux",
+    "forgot.env_other": "это устройство",
+    "forgot.copy": "Скопировать команду",
+    "forgot.copied": "Скопировано.",
+    "console.title": "Лог консоли",
+    "console.hint": "Последние {n} строк. Более старые затираются. Лог можно экспортировать и прислать, если что-то пошло не так.",
+    "console.empty": "Пока нет строк.",
+    "console.refresh": "Обновить",
+    "console.export": "Экспорт",
+    "console.scope_all": "Всё сохранённое",
+    "console.scope_session": "С последнего запуска бота",
+    "data.title": "Перенос настроек",
+    "data.hint": "Сохраняет в файл настройки серверов, пресеты наказаний, причины и счётчики обнаружений. ID пользователей в счётчиках шифруются парольной фразой. Нарушители и логи не включаются. Всё старше 90 дней отбрасывается при импорте.",
+    "data.passphrase": "Парольная фраза",
+    "data.export": "Экспорт",
+    "data.import": "Импорт",
+    "data.file": "Файл экспорта",
+    "data.imported": "Импортировано: серверов {g}, счётчиков {n}.",
+    "data.choose": "Сначала выберите файл.",
+    "err.passphrase_short": "Парольная фраза должна быть не короче 6 символов.",
+    "err.import_invalid": "Это не файл экспорта.",
+    "err.import_passphrase": "Неверная парольная фраза или повреждённый файл.",
+    "privacy.discord": "Удалено лог-сообщений в Discord: {n}.",
+    "privacy.discord_skipped": "Бот не в сети, поэтому лог-каналы в Discord не проверялись.",
+    "privacy.discord_only": "Сохранённых записей нет, но лог-каналы в Discord всё равно будут проверены.",
+    "update.label": "Версия",
+    "update.show": "Показать изменения",
+    "update.hide": "Скрыть изменения",
+    "update.no_git": "Для списка изменений нужна установка через git.",
+    "log.ban": "Бан",
+    "log.strike": "Обнаружение {n} из {total}",
+    "log.deleted_ban": "Сообщения удалены баном (за последние {w})"
   }
 };
 
@@ -493,7 +811,11 @@ const ICONS = {
   status: "M3 12h4l3-8 4 16 3-8h4",
   servers: "M4 5h16v5H4zM4 14h16v5H4zM8 7.5h.01M8 16.5h.01",
   settings: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.7a7 7 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2 1.2l.4 2.7h4l.4-2.7a7 7 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z",
-  logout: "M10 5H5v14h5M15 8l4 4-4 4M9 12h10"
+  proxy: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c3.5 3.2 3.5 14.8 0 18M12 3c-3.5 3.2-3.5 14.8 0 18",
+  logout: "M10 5H5v14h5M15 8l4 4-4 4M9 12h10",
+  search: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4",
+  chevron: "M6 9l6 6 6-6",
+  edit: "M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"
 };
 
 function icon(name) {
@@ -722,10 +1044,16 @@ function logEntryNode(entry, bot) {
     embed.append(h("div", { class: "field" }, h("div", { class: "fname" }, tr("log.moderator")), personBlock(entry.moderator)));
   }
 
-  const action = [tr("log.timeout", { d: fmtDuration(entry.timeout) })];
-  action.push(entry.window
-    ? tr("log.deleted_auto", { n: entry.deleted, w: fmtDuration(entry.window) })
-    : tr("log.deleted_manual", { n: entry.deleted }));
+  const action = [];
+  if (entry.strike && entry.strike.total > 1) action.push(tr("log.strike", { n: entry.strike.n, total: entry.strike.total }));
+  if (entry.action === "ban") {
+    action.push(tr("log.ban"), tr("log.deleted_ban", { w: fmtDuration(entry.window) }));
+  } else {
+    action.push(tr("log.timeout", { d: fmtDuration(entry.timeout) }));
+    action.push(entry.window
+      ? tr("log.deleted_auto", { n: entry.deleted, w: fmtDuration(entry.window) })
+      : tr("log.deleted_manual", { n: entry.deleted }));
+  }
   embed.append(h("div", { class: "field" }, h("div", { class: "fname" }, tr("log.action")), h("div", { class: "fval" }, action.join("\n"))));
 
   const foot = h("div", { class: "foot" });
@@ -838,16 +1166,24 @@ function renderSetup(prefill = {}) {
 function renderLogin() {
   stopTimers();
   const error = formError();
+  const hint = h("div", { class: "msg info", hidden: true });
   const password = h("input", { type: "password", autocomplete: "current-password", required: true, autofocus: true });
   const submit = h("button", { class: "btn block", type: "submit" }, tr("login.submit"));
   const form = h("form", {
     onsubmit: async (event) => {
       event.preventDefault();
       showError(error, "");
+      hint.hidden = true;
       submit.disabled = true;
       const res = await api("POST", "/api/login", { password: password.value });
       submit.disabled = false;
-      if (!res.ok) { showError(error, errorText(res)); password.select(); return; }
+      if (!res.ok) {
+        password.value = "";
+        showError(error, errorText(res));
+        if (res.hint) { hint.textContent = tr("login.hint", { h: res.hint }); hint.hidden = false; }
+        password.focus();
+        return;
+      }
       me.authed = true;
       await enterDashboard();
     }
@@ -856,6 +1192,7 @@ function renderLogin() {
     h("p", { class: "lead" }, tr("login.lead")),
     error,
     field(tr("login.password"), password),
+    hint,
     submit,
     h("div", { class: "actions" }, h("button", { class: "btn link", type: "button", onclick: () => renderForgot() }, tr("login.forgot")))
   );
@@ -868,41 +1205,67 @@ async function renderForgot() {
   const start = await api("POST", "/api/forgot/start", {});
   const back = h("button", { class: "btn link", type: "button", onclick: renderLogin }, tr("forgot.back"));
 
-  if (!start.ok || !start.linked) {
+  if (!start.ok) {
+    mount(authCard(h("div", {}, h("h1", {}, tr("forgot.title")), h("div", { class: "msg error" }, errorText(start)), back), () => renderForgot()));
+    return;
+  }
+
+  const questions = start.questions || [];
+  if (!start.linked && !questions.length) {
+    const info = start.reinstall || { env: "other", command: "" };
+    const box = h("pre", { class: "detail cmd" }, info.command);
     mount(authCard(h("div", {},
       h("h1", {}, tr("forgot.title")),
-      h("div", { class: "msg info" }, start.ok ? tr("forgot.unlinked") : errorText(start)),
-      back
+      h("div", { class: "msg info" }, tr("forgot.no_method", { env: tr(info.env === "termux" ? "forgot.env_termux" : "forgot.env_other") })),
+      box,
+      h("div", { class: "actions" },
+        h("button", { class: "btn secondary", type: "button", onclick: async () => {
+          try { await navigator.clipboard.writeText(info.command); toast(tr("forgot.copied"), "ok"); } catch (e) { const r = document.createRange(); r.selectNodeContents(box); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+        } }, tr("forgot.copy")), back)
     ), () => renderForgot()));
     return;
   }
 
-  const error = formError();
-  const code = h("input", { type: "text", autocomplete: "off", spellcheck: "false", maxlength: "6", required: true });
-  const verify = h("button", { class: "btn block", type: "submit" }, tr("forgot.verify"));
-  const form = h("form", {
-    onsubmit: async (event) => {
-      event.preventDefault();
-      showError(error, "");
-      verify.disabled = true;
-      const res = await api("POST", "/api/forgot/verify", { code: code.value.trim() });
-      verify.disabled = false;
-      if (!res.ok) { showError(error, errorText(res)); return; }
-      renderNewPassword(res.reset_token);
-    }
-  },
-    h("h1", {}, tr("forgot.title")),
-    h("div", { class: "msg info" },
-      tr("forgot.s1") + " ", h("code", {}, "/log"), " " + tr("forgot.s2") + " ",
-      h("strong", {}, tr("forgot.dm")), " " + tr("forgot.s3")
-    ),
-    error,
-    field(tr("forgot.code"), code),
-    verify,
-    h("div", { class: "actions" }, back)
-  );
-  mount(authCard(form, () => renderForgot()));
-  code.focus();
+  const parts = [h("h1", {}, tr("forgot.title"))];
+  if (start.linked) {
+    const error = formError();
+    const code = h("input", { type: "text", autocomplete: "off", spellcheck: "false", maxlength: "6", required: true });
+    const verify = h("button", { class: "btn block", type: "submit" }, tr("forgot.verify"));
+    parts.push(h("form", {
+      onsubmit: async (event) => {
+        event.preventDefault();
+        showError(error, "");
+        verify.disabled = true;
+        const res = await api("POST", "/api/forgot/verify", { code: code.value.trim() });
+        verify.disabled = false;
+        if (!res.ok) { showError(error, errorText(res)); return; }
+        renderNewPassword(res.reset_token);
+      }
+    },
+      h("div", { class: "msg info" }, tr("forgot.s1") + " ", h("code", {}, "/log"), " " + tr("forgot.s2") + " ", h("strong", {}, tr("forgot.dm")), " " + tr("forgot.s3")),
+      error, field(tr("forgot.code"), code), verify));
+  }
+  if (start.linked && questions.length) parts.push(h("div", { class: "or-sep" }, tr("forgot.or")));
+  if (questions.length) {
+    const error = formError();
+    const inputs = questions.map(() => h("input", { type: "text", autocomplete: "off", spellcheck: "false", required: true }));
+    const check = h("button", { class: "btn block", type: "submit" }, tr("forgot.questions_submit"));
+    parts.push(h("form", {
+      onsubmit: async (event) => {
+        event.preventDefault();
+        showError(error, "");
+        check.disabled = true;
+        const res = await api("POST", "/api/forgot/answers", { answers: inputs.map(i => i.value) });
+        check.disabled = false;
+        if (!res.ok) { inputs.forEach(i => { i.value = ""; }); showError(error, errorText(res)); return; }
+        renderNewPassword(res.reset_token);
+      }
+    },
+      h("h3", {}, tr("forgot.questions_title")), error,
+      questions.map((q, i) => field(q.id === "custom" ? q.text : tr("security.q." + q.id), inputs[i])), check));
+  }
+  parts.push(h("div", { class: "actions" }, back));
+  mount(authCard(h("div", {}, parts), () => renderForgot()));
 }
 
 function renderNewPassword(resetToken) {
@@ -941,6 +1304,7 @@ const TABS = [
   ["logs", "nav.logs"],
   ["status", "nav.status"],
   ["servers", "nav.servers"],
+  ["proxy", "nav.proxy"],
   ["settings", "nav.settings"]
 ];
 
@@ -971,14 +1335,15 @@ function renderDashboard() {
   const title = h("div", {});
   const pill = h("div", { class: "pill top", id: "pill" });
   const nav = h("div", { class: "nav" });
-  const brand = h("div", { class: "brand" }, h("div", { class: "avatar fallback", id: "brand-avatar" }, "M"), h("span", {}, "MrBeast GTFO"));
+  const brandName = h("span", { id: "brand-name" }, "MrBeast GTFO");
+  const brand = h("div", { class: "brand" }, h("div", { class: "avatar fallback", id: "brand-avatar" }, "M"), brandName);
 
   function paintNav() {
     nav.replaceChildren(...TABS.map(([id, label]) => h("button", {
       class: ui.tab === id ? "active" : "",
       type: "button",
       onclick: () => { ui.tab = id; paintNav(); paintTab(); }
-    }, icon(id === "logs" ? "logs" : id), h("span", {}, tr(label)))));
+    }, icon(id), h("span", {}, tr(label)))));
     title.textContent = tr(TABS.find(t => t[0] === ui.tab)[1]);
   }
 
@@ -992,26 +1357,29 @@ function renderDashboard() {
     const bot = statusData && statusData.ok ? statusData.bot.user : null;
     const holder = document.getElementById("brand-avatar");
     if (holder && bot) holder.replaceWith(Object.assign(avatarNode(bot), { id: "brand-avatar" }));
+    if (bot && bot.name) brandName.textContent = bot.name;
   }
 
   paintPillFn = paintPill;
 
-  function paintTab() {
+  async function paintTab() {
     if (ui.tab === "logs") renderLogsTab(content);
-    else if (ui.tab === "status") renderStatusTab(content);
+    else if (ui.tab === "status") { await refreshConsole(20); if (ui.tab === "status") renderStatusTab(content); }
     else if (ui.tab === "servers") renderServersTab(content);
+    else if (ui.tab === "proxy") renderProxyTab(content);
     else renderSettingsTab(content);
   }
 
   const logout = h("button", {
-    class: "btn secondary small", type: "button",
+    class: "btn secondary small block", type: "button",
     onclick: async () => { await api("POST", "/api/logout", {}); me.authed = false; stopTimers(); renderLogin(); }
   }, icon("logout"), h("span", { class: "label" }, tr("nav.logout")));
 
   mount(h("div", { class: "shell" },
-    h("aside", { class: "side" }, brand, nav),
+    h("aside", { class: "side" }, brand, nav, h("div", { class: "side-foot" }, langInline(), logout)),
     h("section", { class: "main" },
-      h("header", { class: "topbar" }, h("div", { class: "top-left" }, title, pill), logout),
+      h("header", { class: "topbar" }, h("div", { class: "top-left" }, title, pill),
+        h("a", { class: "byline", href: "https://github.com/BigFloppa9", target: "_blank", rel: "noopener noreferrer" }, "By BigFloppa9")),
       banner,
       content
     )
@@ -1028,9 +1396,10 @@ function renderDashboard() {
     statusData = res;
     paintPill();
     const current = res.bot.status;
-    if (ui.tab === "status") renderStatusTab(content);
+    if (ui.tab === "status") { await refreshConsole(20); renderStatusTab(content); }
     if (ui.tab === "servers" && previousStatus !== null && previousStatus !== current && (previousStatus === "stopped" || current === "stopped")) renderServersTab(content);
-    if (ui.tab === "settings") { renderModerator(); if (proxyRefresh) proxyRefresh(); }
+    if (ui.tab === "settings") renderModerator();
+    if (ui.tab === "proxy" && proxyRefresh) proxyRefresh();
     if (ui.tab === "logs") repaintFeed();
     previousStatus = current;
   });
@@ -1088,6 +1457,8 @@ function stat(label, value) {
 let paintPillFn = null;
 
 async function botAction(action, content) {
+  if (action === "pause" && !(await confirmDialog(tr("confirm.pause")))) return;
+  if (action === "stop" && !(await confirmDialog(tr("confirm.stop")))) return;
   const res = await api("POST", "/api/bot/" + action, {});
   if (!res.ok) { toast(errorText(res), "error"); return; }
   const status = await api("GET", "/api/status");
@@ -1105,9 +1476,8 @@ function renderStatusTab(content) {
   } else if (!statusData.token_ready) {
     nodes.push(h("div", { class: "msg error" }, tr("status.err.token_unreadable")));
   }
-  nodes.push(h("div", { class: "stat-grid" },
+  nodes.push(h("div", { class: "stat-grid wide-grid" },
     stat(tr("stat.status"), tr("state." + bot.status)),
-    stat(tr("stat.bot"), bot.user ? bot.user.name : "—"),
     stat(tr("stat.ping"), bot.latency === null ? "—" : bot.latency + " ms"),
     stat(tr("stat.uptime"), fmtUptime(bot.uptime)),
     stat(tr("stat.servers"), String(bot.guilds.length))
@@ -1121,18 +1491,22 @@ function renderStatusTab(content) {
         h("button", { class: "btn secondary", type: "button", onclick: () => botAction("restart", content) }, tr("bot.restart")),
         h("button", { class: "btn danger", type: "button", onclick: () => botAction("stop", content) }, tr("bot.stop"))
       ];
-  nodes.push(h("div", { class: "section" }, h("h3", {}, tr("bot.controls")),
-    paused ? h("p", { class: "meta" }, tr("bot.paused_hint")) : null,
-    h("div", { class: "actions" }, buttons)));
-  const net = statusData.network;
-  if (net && net.addresses.length) {
-    nodes.push(h("div", { class: "section" }, h("h3", {}, tr("net.title")),
-      h("p", { class: "meta" }, tr("net.hint")),
-      net.addresses.map(item => h("div", { class: "addr" },
-        h("a", { href: "http://" + item.ip + ":" + net.port }, "http://" + item.ip + ":" + net.port),
-        h("span", { class: "meta" }, tr("net." + item.kind) + (item.iface ? " · " + item.iface : ""))))));
-  }
-  content.replaceChildren(h("div", { class: "panel" }, nodes));
+  nodes.push(h("div", { class: "status-cards" },
+    h("div", { class: "section fit" }, h("h3", {}, tr("bot.controls")),
+      paused ? h("p", { class: "meta" }, tr("bot.paused_hint")) : null,
+      h("div", { class: "actions" }, buttons)),
+    (() => {
+      const net = statusData.network;
+      if (!net || !net.addresses.length) return null;
+      return h("div", { class: "section fit" }, h("h3", {}, tr(net.addresses.length > 1 ? "net.title_many" : "net.title_one")),
+        h("p", { class: "meta" }, tr("net.hint")),
+        net.addresses.map(item => h("div", { class: "addr" },
+          h("a", { href: "http://" + item.ip + ":" + net.port }, "http://" + item.ip + ":" + net.port),
+          h("span", { class: "meta" }, tr("net." + item.kind) + (item.iface ? " · " + item.iface : "")))));
+    })()));
+  nodes.push(h("div", { class: "section" }, h("h3", {}, tr("status.console")),
+    h("pre", { class: "console-box" }, consoleCache.length ? consoleCache.map(consoleLine).join("\n") : tr("status.console_empty"))));
+  content.replaceChildren(h("div", { class: "panel wide" }, nodes));
 }
 
 function guildIcon(guild) {
@@ -1155,20 +1529,8 @@ function renderServersTab(content) {
   }
   if (!ui.guild || !bot.guilds.some(g => g.id === ui.guild)) ui.guild = bot.guilds[0].id;
   const body = h("div", {});
-  const list = h("div", { class: "section" }, h("h3", {}, tr("status.servers")));
-  const rows = bot.guilds.map(guild => {
-    const row = h("button", { class: "guild pick" + (guild.id === ui.guild ? " selected" : ""), type: "button" },
-      guildIcon(guild),
-      h("div", {}, h("div", { class: "name" }, guild.name), h("div", { class: "meta" }, tr("status.members", { n: guild.members ?? "?" }))));
-    row.addEventListener("click", () => {
-      ui.guild = guild.id;
-      rows.forEach(r => r.classList.toggle("selected", r === row));
-      loadGuild(body, ui.guild);
-    });
-    return row;
-  });
-  list.append(...rows);
-  content.replaceChildren(h("div", { class: "panel" }, list, body));
+  const picker = serverPicker(bot.guilds, ui.guild, (guild) => { ui.guild = guild.id; loadGuild(body, ui.guild); });
+  content.replaceChildren(h("div", { class: "panel" }, h("div", { class: "section" }, h("h3", {}, tr("status.servers")), picker), body));
   loadGuild(body, ui.guild);
 }
 
@@ -1186,18 +1548,92 @@ async function loadGuild(body, guildId) {
   const images = h("input", { type: "number", min: "1", max: "50", value: s.auto_min_images });
   const channels = h("input", { type: "number", min: "1", max: "50", value: s.auto_min_channels });
   const windowSeconds = h("input", { type: "number", min: "1", max: "3600", value: s.auto_window_seconds });
+  const resetDays = h("input", { type: "number", min: "1", max: "90", value: s.warn_reset_days });
+  const dm = h("input", { type: "checkbox" });
+  dm.checked = s.dm_reason;
   const save = h("button", { class: "btn", type: "submit" }, tr("servers.save"));
+
+  const preset = h("select", {}, ["default", "ladder", "ladder_ban", "custom"].map(id => h("option", { value: id }, tr("preset." + id))));
+  preset.value = s.punish_preset;
+  let custom = (s.custom_steps || []).map(step => ({ action: step.action, duration: fmtDuration(step.duration || 60), delete: fmtDuration(step.delete), reason: step.reason || "" }));
+  const defaultBox = h("div", {},
+    field(tr("servers.reason"), reason, tr("servers.reason_hint")),
+    h("div", { class: "row" },
+      field(tr("servers.timeout"), timeout, tr("servers.timeout_hint")),
+      field(tr("servers.delete"), del, tr("servers.delete_hint"))));
+  const stepsBox = h("div", {});
+
+  function previewOf(id) {
+    return (s.preview[id] || []).map(step => ({ action: step.action, duration: fmtDuration(step.duration || 60), delete: fmtDuration(step.delete), reason: step.reason }));
+  }
+
+  function paintSteps() {
+    const id = preset.value;
+    defaultBox.hidden = id !== "default";
+    if (id === "default") { stepsBox.replaceChildren(); return; }
+    if (id !== "custom") {
+      stepsBox.replaceChildren(...s.preview[id].map((step, i) => h("div", { class: "step" },
+        h("div", { class: "step-head" }, h("b", {}, tr("step.n", { n: i + 1 })), h("span", { class: "meta" }, stepSummary(step))),
+        h("div", { class: "meta step-reason" }, step.reason))));
+      return;
+    }
+    if (!custom.length) custom = previewOf("ladder_ban").length ? previewOf("ladder_ban") : [{ action: "timeout", duration: "1d", delete: "1d", reason: "" }];
+    const nodes = custom.map((step, i) => {
+      const action = h("select", { onchange: () => { step.action = action.value; paintSteps(); } },
+        h("option", { value: "timeout" }, tr("step.timeout")), h("option", { value: "ban" }, tr("step.ban")));
+      action.value = step.action;
+      const dur = h("input", { type: "text", value: step.duration, autocomplete: "off", oninput: () => { step.duration = dur.value; } });
+      const delIn = h("input", { type: "text", value: step.delete, autocomplete: "off", oninput: () => { step.delete = delIn.value; } });
+      const why = h("textarea", { maxlength: "512", rows: "2", oninput: () => { step.reason = why.value; } }, step.reason);
+      return h("div", { class: "step" },
+        h("div", { class: "step-head" }, h("b", {}, tr("step.n", { n: i + 1 })),
+          custom.length > 1 ? h("button", { class: "btn secondary small", type: "button", title: tr("step.remove"), onclick: () => { custom.splice(i, 1); paintSteps(); } }, "×") : null),
+        h("div", { class: "row" }, field(tr("step.action"), action),
+          step.action === "timeout" ? field(tr("step.duration"), dur) : null,
+          field(tr("step.delete"), delIn)),
+        field(tr("step.reason"), why));
+    });
+    if (custom.length < s.max_steps) nodes.push(h("button", { class: "btn secondary", type: "button", onclick: () => { const last = custom[custom.length - 1]; custom.push({ ...last }); paintSteps(); } }, tr("step.add")));
+    nodes.push(h("p", { class: "meta" }, tr("step.custom_note")));
+    stepsBox.replaceChildren(...nodes);
+  }
+
+  let lastPreset = preset.value;
+  preset.addEventListener("change", () => {
+    if (preset.value === "custom" && !custom.length && lastPreset !== "default") custom = previewOf(lastPreset);
+    lastPreset = preset.value;
+    paintSteps();
+  });
+
+  function collectSteps() {
+    const out = [];
+    for (let i = 0; i < custom.length; i++) {
+      const step = custom[i];
+      const d = step.action === "timeout" ? parseMinutes(step.duration) : 0;
+      const w = parseMinutes(step.delete);
+      if (w === null || (step.action === "timeout" && (d === null || d < 1 || d > 40320)) || w > (step.action === "ban" ? 10080 : 525600)) return { error: tr("step.invalid", { n: i + 1 }) };
+      out.push({ action: step.action, duration: d, delete: w, reason: step.reason.trim() });
+    }
+    return { steps: out };
+  }
 
   const form = h("form", {
     onsubmit: async (event) => {
       event.preventDefault();
       showError(error, "");
-      save.disabled = true;
-      const result = await api("PUT", "/api/guilds/" + encodeURIComponent(guildId) + "/settings", {
+      const payload = {
         timeout_reason: reason.value, timeout: timeout.value, delete_window: del.value,
         log_channel: channel.value, auto_min_images: images.value,
-        auto_min_channels: channels.value, auto_window_seconds: windowSeconds.value
-      });
+        auto_min_channels: channels.value, auto_window_seconds: windowSeconds.value,
+        punish_preset: preset.value, warn_reset_days: resetDays.value, dm_reason: dm.checked
+      };
+      if (preset.value === "custom") {
+        const collected = collectSteps();
+        if (collected.error) { showError(error, collected.error); return; }
+        payload.custom_steps = collected.steps;
+      }
+      save.disabled = true;
+      const result = await api("PUT", "/api/guilds/" + encodeURIComponent(guildId) + "/settings", payload);
       save.disabled = false;
       if (!result.ok) {
         if (result.error === "validation") showError(error, result.errors.map(code => errorText({ error: code })).join("\n"));
@@ -1205,19 +1641,21 @@ async function loadGuild(body, guildId) {
         error.style.whiteSpace = "pre-line";
         return;
       }
-      const next = result.settings;
-      timeout.value = next.timeout;
-      del.value = next.delete_window;
+      Object.assign(s, result.settings);
+      timeout.value = s.timeout;
+      del.value = s.delete_window;
       toast(tr("servers.saved"), "ok");
     }
   },
     error,
     h("div", { class: "section" },
-      field(tr("servers.reason"), reason, tr("servers.reason_hint")),
-      h("div", { class: "row" },
-        field(tr("servers.timeout"), timeout, tr("servers.timeout_hint")),
-        field(tr("servers.delete"), del, tr("servers.delete_hint"))
-      ),
+      h("h3", {}, tr("servers.punish")),
+      h("p", { class: "meta" }, tr("servers.punish_hint")),
+      field(tr("servers.punish"), preset),
+      defaultBox,
+      stepsBox,
+      h("div", { class: "row" }, field(tr("servers.reset_days"), resetDays, tr("servers.reset_days_hint"))),
+      h("label", { class: "check" }, dm, h("span", {}, tr("servers.dm_reason"))),
       field(tr("servers.log_channel"), channel)
     ),
     h("div", { class: "section" },
@@ -1231,6 +1669,7 @@ async function loadGuild(body, guildId) {
     ),
     save
   );
+  paintSteps();
   body.replaceChildren(form);
 }
 
@@ -1241,11 +1680,21 @@ function moderatorSection() {
 function renderModerator() {
   const box = document.getElementById("moderator");
   if (!box || !statusData || !statusData.ok) return;
-  const mod = statusData.moderator;
-  if (regCode && mod.linked && regCode.linkedBefore !== mod.id) regCode = null;
+  const mods = statusData.moderators || [];
   const nodes = [h("h3", {}, tr("settings.moderator"))];
-  nodes.push(h("div", { class: mod.linked ? "msg ok" : "msg info" },
-    mod.linked ? tr("settings.mod_linked", { name: mod.name }) : tr("settings.mod_none")));
+  if (!mods.length) nodes.push(h("div", { class: "msg info" }, tr("settings.mod_none")));
+  for (const mod of mods) {
+    nodes.push(h("div", { class: "mod-row" },
+      h("div", { class: "mod-name" }, h("div", {}, mod.name || "—"), h("div", { class: "meta mono" }, mod.id)),
+      h("button", { class: "btn secondary small", type: "button", onclick: async () => {
+        if (!(await confirmDialog(tr("confirm.moderator_remove")))) return;
+        const res = await api("DELETE", "/api/moderator/" + encodeURIComponent(mod.id), {});
+        if (!res.ok) { toast(errorText(res), "error"); return; }
+        const status = await api("GET", "/api/status");
+        if (status.ok) statusData = status;
+        renderModerator();
+      } }, tr("settings.mod_remove"))));
+  }
   if (regCode && statusData.reg.active) {
     nodes.push(h("div", { class: "code-box" }, regCode.code));
     nodes.push(h("p", { class: "meta" },
@@ -1259,7 +1708,7 @@ function renderModerator() {
     onclick: async () => {
       const res = await api("POST", "/api/moderator/code", {});
       if (!res.ok) { toast(errorText(res), "error"); return; }
-      regCode = { code: res.code, linkedBefore: statusData.moderator.id };
+      regCode = { code: res.code };
       const status = await api("GET", "/api/status");
       if (status.ok) statusData = status;
       renderModerator();
@@ -1270,8 +1719,29 @@ function renderModerator() {
 
 function updateSection() {
   const result = h("div", {});
+  const changes = h("div", { class: "changes-box", hidden: true });
   const password = h("input", { type: "password", autocomplete: "current-password" });
-  const checkButton = h("button", { class: "btn secondary", type: "button", onclick: () => check() }, tr("update.check"));
+  const version = h("b", {}, "…");
+  const checkButton = h("button", { class: "btn secondary small", type: "button", onclick: () => check() }, tr("update.check"));
+  let loaded = false;
+  const toggleButton = h("button", { class: "btn secondary small", type: "button", onclick: () => toggle() }, icon("chevron"), h("span", {}, tr("update.show")));
+
+  api("GET", "/api/update/info").then(info => { if (info.ok) version.textContent = "v" + info.version; });
+
+  async function toggle() {
+    const opening = changes.hidden;
+    changes.hidden = !opening;
+    toggleButton.classList.toggle("open", opening);
+    toggleButton.lastChild.textContent = tr(opening ? "update.hide" : "update.show");
+    if (!opening || loaded) return;
+    changes.replaceChildren(h("p", { class: "meta" }, "…"));
+    const info = await api("GET", "/api/update/info");
+    if (!info.ok || !info.git) { changes.replaceChildren(h("p", { class: "meta" }, tr("update.no_git"))); return; }
+    loaded = true;
+    changes.replaceChildren(...info.commits.map(commit => h("div", { class: "commit" },
+      h("div", { class: "commit-head" }, h("b", {}, commit.title), h("span", { class: "meta" }, commit.date + " · " + commit.hash)),
+      commit.body ? h("ul", {}, commit.body.split("\n").filter(Boolean).map(line => h("li", {}, line.replace(/^[-–•]\s*/, "")))) : null)));
+  }
 
   async function check() {
     checkButton.disabled = true;
@@ -1279,7 +1749,7 @@ function updateSection() {
     const res = await api("GET", "/api/update/check");
     checkButton.disabled = false;
     if (!res.ok) { result.replaceChildren(h("div", { class: "msg error" }, errorText(res))); return; }
-    const nodes = [h("p", { class: "meta" }, tr("update.version", { v: res.version, h: res.head }))];
+    const nodes = [];
     if (!res.behind) {
       nodes.push(h("div", { class: "msg ok" }, tr("update.latest")));
     } else {
@@ -1316,7 +1786,10 @@ function updateSection() {
     }, 1500);
   }
 
-  return h("div", { class: "section" }, h("h3", {}, tr("update.title")), h("div", { class: "actions" }, checkButton), result);
+  return h("div", { class: "update-card" },
+    h("div", { class: "update-top" }, h("div", { class: "update-version" }, h("span", { class: "meta" }, tr("update.label")), version),
+      h("div", { class: "update-buttons" }, toggleButton, checkButton)),
+    changes, result);
 }
 
 function privacySection() {
@@ -1329,20 +1802,24 @@ function privacySection() {
     if (!q) { out.replaceChildren(); return; }
     const res = await api("POST", "/api/privacy/erase", { query: q, confirm: false });
     if (!res.ok) { out.replaceChildren(h("div", { class: "msg error" }, errorText(res))); return; }
-    if (!res.count) { out.replaceChildren(h("div", { class: "msg info" }, tr("privacy.none"))); return; }
+    const digits = /^\d{15,25}$/.test(q.replace(/^@/, ""));
+    if (!res.count && !digits) { out.replaceChildren(h("div", { class: "msg info" }, tr("privacy.none"))); return; }
     out.replaceChildren(
-      h("div", { class: "msg info" }, tr("privacy.found", { n: res.count })),
+      h("div", { class: "msg info" }, res.count ? tr("privacy.found", { n: res.count }) : tr("privacy.discord_only")),
       h("button", { class: "btn danger", type: "button", onclick: erase }, tr("privacy.erase"))
     );
   }
 
   async function erase() {
+    if (!(await confirmDialog(tr("confirm.erase")))) return;
     const res = await api("POST", "/api/privacy/erase", { query: query.value.trim(), confirm: true });
     if (!res.ok) { toast(errorText(res), "error"); return; }
     query.value = "";
     logs = [];
     lastLogId = 0;
-    out.replaceChildren(h("div", { class: "msg ok" }, tr("privacy.done", { n: res.count })));
+    const lines = [h("div", { class: "msg ok" }, tr("privacy.done", { n: res.count }))];
+    if (res.discord) lines.push(h("div", { class: "msg info" }, res.discord.skipped ? tr("privacy.discord_skipped") : tr("privacy.discord", { n: res.discord.deleted })));
+    out.replaceChildren(...lines);
   }
 
   return h("div", { class: "section" },
@@ -1356,27 +1833,36 @@ function privacySection() {
 
 let proxyRefresh = null;
 
+function agoText(ts) {
+  if (!ts) return tr("proxy.never");
+  const minutes = Math.floor((Date.now() / 1000 - ts) / 60);
+  return minutes < 1 ? tr("proxy.ago_now") : tr("proxy.ago_min", { n: minutes });
+}
+
 function proxySection() {
   const text = h("textarea", { class: "proxy-input", spellcheck: "false", placeholder: tr("proxy.placeholder"), maxlength: "400000" });
   const list = h("div", { class: "proxy-list" });
   const note = h("div", {});
   const count = h("span", { class: "meta" });
+  const checked = h("span", { class: "meta" });
   const addButton = h("button", { class: "btn", type: "button" }, tr("proxy.add"));
   const subs = h("div", { class: "proxy-list" });
-  const subInput = h("input", { type: "text", autocomplete: "off", spellcheck: "false", placeholder: tr("proxy.sub_placeholder") });
-  const subButton = h("button", { class: "btn secondary", type: "button" }, tr("proxy.sub_add"));
 
-  function statusOf(row) {
+  function statusOf(row, limit) {
     if (row.active) return ["online", tr("proxy.active") + (row.status && row.status.ms ? " · " + row.status.ms + " ms" : "")];
     if (!row.status) return ["", tr("proxy.unknown")];
-    return row.status.ok ? ["online", tr("proxy.ok")] : ["error", tr("proxy.failed")];
+    if (row.status.ok) return ["online", tr("proxy.ok")];
+    const hours = Math.floor((row.down || 0) / 3600);
+    return ["error", hours > 0 ? tr("proxy.down_for", { h: hours, limit: Math.round(limit / 3600) }) : tr("proxy.failed")];
   }
 
   function paint(data) {
     count.textContent = tr("proxy.count", { n: data.entries.length, max: data.max });
+    checked.textContent = tr("proxy.checked", { t: agoText(data.checked) });
     const notes = [];
     if (data.binary.state === "downloading") notes.push(h("div", { class: "msg info" }, tr("proxy.xray_downloading")));
     if (data.binary.state === "error") notes.push(h("div", { class: "msg error" }, tr("proxy.xray_error", { detail: data.binary.detail })));
+    if (data.internet === false) notes.push(h("div", { class: "msg info" }, tr("proxy.no_internet")));
     note.replaceChildren(...notes);
     subs.replaceChildren(...data.subs.map(sub => h("div", { class: "proxy-row sub" },
       h("span", { class: "badge" }, "sub"),
@@ -1386,12 +1872,13 @@ function proxySection() {
       h("button", { class: "btn secondary small", type: "button", title: tr("proxy.remove"), onclick: () => removeSub(sub.id) }, "×"))));
     if (!data.entries.length) { list.replaceChildren(h("div", { class: "empty" }, tr("proxy.empty"))); return; }
     list.replaceChildren(...data.entries.map((row, index) => {
-      const [dot, label] = statusOf(row);
+      const [dot, label] = statusOf(row, data.limit || 86400);
       return h("div", { class: "proxy-row" },
         h("span", { class: "proxy-num" }, String(index + 1)),
         h("span", { class: "badge" }, row.type),
         h("span", { class: "proxy-label" }, row.label),
         h("span", { class: "proxy-state" }, h("span", { class: "dot " + dot }), label),
+        h("button", { class: "btn secondary small icon-btn", type: "button", title: tr("proxy.edit"), onclick: () => openProxyDialog(row.id, (res) => { paint(res); }) }, icon("edit")),
         h("button", { class: "btn secondary small", type: "button", title: tr("proxy.remove"), onclick: () => remove(row.id) }, "×")
       );
     }));
@@ -1403,6 +1890,7 @@ function proxySection() {
   }
 
   async function remove(id) {
+    if (!(await confirmDialog(tr("confirm.proxy_remove")))) return;
     const res = await api("DELETE", "/api/proxy/" + encodeURIComponent(id), {});
     if (!res.ok) { toast(errorText(res), "error"); return; }
     paint(res);
@@ -1410,32 +1898,23 @@ function proxySection() {
 
   async function updateSub(id) {
     const res = await api("POST", "/api/proxy/sub/" + encodeURIComponent(id) + "/update", {});
-    if (!res.ok) { toast(errorText(res), "error"); return; }
+    if (!res.ok) { toast(errorText(res) + (res.detail ? " (" + res.detail + ")" : ""), "error"); return; }
     paint(res);
     toast(tr("proxy.sub_updated", { n: res.subs.find(s => s.id === id)?.count ?? 0 }), "ok");
   }
 
   async function removeSub(id) {
+    if (!(await confirmDialog(tr("confirm.sub_remove")))) return;
     const res = await api("DELETE", "/api/proxy/sub/" + encodeURIComponent(id), {});
     if (!res.ok) { toast(errorText(res), "error"); return; }
     paint(res);
   }
 
-  subButton.addEventListener("click", async () => {
-    subButton.disabled = true;
-    const res = await api("POST", "/api/proxy/sub", { url: subInput.value.trim() });
-    subButton.disabled = false;
-    if (!res.ok) { toast(errorText(res), "error"); return; }
-    subInput.value = "";
-    paint(res);
-    toast(tr("proxy.sub_added", { n: res.subs[res.subs.length - 1].count }), "ok");
-  });
-
   addButton.addEventListener("click", async () => {
     addButton.disabled = true;
     const res = await api("POST", "/api/proxy", { text: text.value });
     addButton.disabled = false;
-    const lines = (res.errors || []).map(e => tr("proxy.item", { n: e.n, text: errorText({ error: e.code }) }));
+    const lines = (res.errors || []).map(e => tr("proxy.item", { n: e.n, text: errorText({ error: e.code }) + (e.detail ? " (" + e.detail + ")" : "") }));
     if (!res.ok) {
       note.replaceChildren(h("div", { class: "msg error" }, [errorText(res), ...lines].join("\n")));
       return;
@@ -1450,19 +1929,451 @@ function proxySection() {
   refresh();
 
   return h("div", { class: "section" },
-    h("h3", {}, tr("proxy.title")),
     h("p", { class: "meta" }, tr("proxy.hint", { max: 100 })),
-    count,
+    h("div", { class: "proxy-meta" }, count, checked),
     note,
+    subs,
     list,
     text,
-    h("div", { class: "actions" }, addButton),
-    h("h3", { class: "sub-title" }, tr("proxy.sub_title")),
-    h("p", { class: "meta" }, tr("proxy.sub_hint")),
-    subs,
-    field(tr("proxy.sub_title"), subInput),
-    h("div", { class: "actions" }, subButton)
+    h("div", { class: "actions" }, addButton,
+      h("button", { class: "btn secondary", type: "button", onclick: () => openProxyDialog(null, (res) => { paint(res); toast(tr("proxy.added", { n: 1 }), "ok"); }) }, tr("proxy.form")))
   );
+}
+
+function renderProxyTab(content) {
+  content.replaceChildren(h("div", { class: "panel" }, proxySection()));
+}
+
+function confirmDialog(message, yesLabel) {
+  return new Promise(resolve => {
+    const onKey = (event) => { if (event.key === "Escape") done(false); };
+    const done = (value) => { back.remove(); document.removeEventListener("keydown", onKey); resolve(value); };
+    const back = h("div", { class: "modal-back", onclick: (event) => { if (event.target === back) done(false); } },
+      h("div", { class: "modal small", role: "dialog", "aria-modal": "true" },
+        h("p", { class: "modal-text" }, message),
+        h("div", { class: "modal-actions" },
+          h("button", { class: "btn secondary", type: "button", onclick: () => done(false) }, tr("confirm.no")),
+          h("button", { class: "btn danger", type: "button", onclick: () => done(true) }, yesLabel || tr("confirm.yes")))));
+    document.addEventListener("keydown", onKey);
+    document.body.append(back);
+  });
+}
+
+function parseMinutes(text) {
+  const value = String(text || "").trim().toLowerCase();
+  if (!value) return null;
+  if (/^\d+$/.test(value)) return parseInt(value, 10);
+  const re = /(\d+)\s*([dhm])/g;
+  let total = 0, used = 0, m;
+  while ((m = re.exec(value))) {
+    total += parseInt(m[1], 10) * ({ d: 1440, h: 60, m: 1 })[m[2]];
+    used += m[0].length;
+  }
+  return used && used === value.replace(/\s+/g, "").length ? total : null;
+}
+
+function consoleLine(item) {
+  const d = new Date(item.ts * 1000);
+  return pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds()) + " " + item.level + " " + item.msg;
+}
+
+let consoleCache = [];
+
+async function refreshConsole(limit) {
+  const res = await api("GET", "/api/console?limit=" + limit);
+  if (res.ok) consoleCache = res.lines;
+}
+
+function langInline() {
+  return langSwitch(async () => {
+    const res = await api("PUT", "/api/config", { panel_lang: LANG });
+    if (res.ok) me.panel_lang = res.config.panel_lang;
+    renderDashboard();
+  });
+}
+
+const LAYOUT_EN = "qwertyuiop[]asdfghjkl;'zxcvbnm,.`";
+
+const LAYOUT_RU = "йцукенгшщзхъфывапролджэячсмитьбюё";
+
+function swapLayout(text) {
+  let out = "";
+  for (const ch of text.toLowerCase()) {
+    const a = LAYOUT_EN.indexOf(ch);
+    const b = LAYOUT_RU.indexOf(ch);
+    out += a >= 0 ? LAYOUT_RU[a] : b >= 0 ? LAYOUT_EN[b] : ch;
+  }
+  return out;
+}
+
+function normText(text) {
+  return String(text || "").toLowerCase().replace(/ё/g, "е").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+function editDistance(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let older = null;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + cost);
+      if (older && i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) row[j] = Math.min(row[j], older[j - 2] + 1);
+      best = Math.min(best, row[j]);
+    }
+    if (best > max) return max + 1;
+    older = prev;
+    prev = row;
+  }
+  return prev[b.length];
+}
+
+function isSubsequence(small, big) {
+  let i = 0;
+  for (const ch of big) if (ch === small[i]) i++;
+  return i === small.length;
+}
+
+function wordScore(token, words) {
+  let best = 0;
+  words.forEach((word, index) => {
+    const early = index === 0 ? 4 : 0;
+    let score = 0;
+    if (word === token) score = 80 + early;
+    else if (word.startsWith(token)) score = 70 + early;
+    else if (word.includes(token)) score = 50;
+    else if (token.length >= 3 && editDistance(word.slice(0, token.length), token, 1) <= 1) score = 40 + early;
+    else if (token.length >= 4 && editDistance(word, token, 1) <= 1) score = 35;
+    else if (token.length >= 3 && isSubsequence(token, word)) score = 20;
+    best = Math.max(best, score);
+  });
+  return best;
+}
+
+function nameScore(name, query) {
+  const nameN = normText(name);
+  const words = nameN.split(" ").filter(Boolean);
+  let best = 0;
+  for (const variant of new Set([normText(query), normText(swapLayout(query))])) {
+    if (!variant) continue;
+    if (nameN === variant) return 100;
+    if (nameN.startsWith(variant)) best = Math.max(best, 90);
+    const squeezed = nameN.replace(/ /g, ""), flat = variant.replace(/ /g, "");
+    if (flat.length >= 2) {
+      if (squeezed.startsWith(flat)) best = Math.max(best, 85);
+      else if (squeezed.includes(flat)) best = Math.max(best, 60);
+      else if (flat.length >= 4 && editDistance(squeezed.slice(0, flat.length), flat, 1) <= 1) best = Math.max(best, 45);
+    }
+    const tokens = variant.split(" ").filter(Boolean);
+    const scores = tokens.map(token => wordScore(token, words));
+    if (scores.length && scores.every(v => v > 0)) best = Math.max(best, scores.reduce((a, b) => a + b, 0) / scores.length);
+  }
+  return best;
+}
+
+function rankGuilds(guilds, query) {
+  if (!query.trim()) return [...guilds].sort((a, b) => a.name.localeCompare(b.name));
+  return guilds
+    .map(guild => ({ guild, score: nameScore(guild.name, query) }))
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.guild.name.localeCompare(b.guild.name))
+    .map(item => item.guild);
+}
+
+function serverPicker(guilds, selectedId, onPick) {
+  let open = false;
+  let hot = 0;
+  let shown = [];
+  const root = h("div", { class: "picker" });
+  const button = h("button", { class: "picker-btn", type: "button", onclick: () => toggle() });
+  const input = h("input", { class: "picker-input", type: "text", autocomplete: "off", spellcheck: "false", placeholder: tr("servers.search") });
+  const clear = h("button", { class: "picker-clear", type: "button", hidden: true, title: "×", onclick: () => { input.value = ""; refresh(); input.focus(); } }, "×");
+  const label = h("div", { class: "picker-label" });
+  const list = h("div", { class: "picker-list", role: "listbox" });
+  const pop = h("div", { class: "picker-pop", hidden: true }, h("div", { class: "picker-search" }, icon("search"), input, clear), label, list);
+
+  function row(guild, index) {
+    const item = h("button", {
+      class: "picker-row" + (index === hot ? " hot" : "") + (guild.id === selectedId ? " current" : ""), type: "button", role: "option",
+      onmouseenter: () => { hot = index; markHot(); },
+      onclick: () => choose(guild)
+    }, guildIcon(guild), h("div", { class: "picker-text" }, h("div", { class: "name" }, guild.name), h("div", { class: "meta" }, tr("status.members", { n: guild.members ?? "?" }))));
+    return item;
+  }
+
+  function markHot() {
+    [...list.children].forEach((node, index) => node.classList.toggle("hot", index === hot));
+    const node = list.children[hot];
+    if (node && node.scrollIntoView) node.scrollIntoView({ block: "nearest" });
+  }
+
+  function refresh() {
+    const query = input.value;
+    clear.hidden = !query;
+    shown = rankGuilds(guilds, query);
+    hot = 0;
+    label.textContent = tr(query.trim() ? "servers.search_results" : "servers.all");
+    list.replaceChildren(...(shown.length ? shown.map(row) : [h("div", { class: "empty" }, tr("servers.nothing"))]));
+  }
+
+  function paintButton() {
+    const guild = guilds.find(g => g.id === selectedId) || guilds[0];
+    button.replaceChildren(guildIcon(guild), h("div", { class: "picker-text" }, h("div", { class: "name" }, guild.name), h("div", { class: "meta" }, tr("status.members", { n: guild.members ?? "?" }))), icon("chevron"));
+  }
+
+  function choose(guild) {
+    selectedId = guild.id;
+    paintButton();
+    close();
+    onPick(guild);
+  }
+
+  function onDocument(event) { if (!root.contains(event.target)) close(); }
+
+  function onKey(event) {
+    if (event.key === "ArrowDown") { event.preventDefault(); hot = Math.min(hot + 1, shown.length - 1); markHot(); }
+    else if (event.key === "ArrowUp") { event.preventDefault(); hot = Math.max(hot - 1, 0); markHot(); }
+    else if (event.key === "Enter") { event.preventDefault(); if (shown[hot]) choose(shown[hot]); }
+    else if (event.key === "Escape") { close(); button.focus(); }
+  }
+
+  function toggle() { open ? close() : openPop(); }
+  function openPop() {
+    open = true;
+    pop.hidden = false;
+    root.classList.add("open");
+    input.value = "";
+    refresh();
+    document.addEventListener("mousedown", onDocument);
+    input.focus();
+  }
+  function close() {
+    open = false;
+    pop.hidden = true;
+    root.classList.remove("open");
+    document.removeEventListener("mousedown", onDocument);
+  }
+
+  input.addEventListener("input", refresh);
+  input.addEventListener("keydown", onKey);
+  paintButton();
+  root.append(button, pop);
+  return root;
+}
+
+function stepSummary(step) {
+  return step.action === "ban"
+    ? tr("step.line_ban", { w: fmtDuration(step.delete) })
+    : tr("step.line_timeout", { d: fmtDuration(step.duration), w: fmtDuration(step.delete) });
+}
+
+function securitySection() {
+  const box = h("div", { class: "section" });
+  const error = formError();
+  let model = null;
+
+  async function load() {
+    const res = await api("GET", "/api/security");
+    if (!res.ok) { box.replaceChildren(h("div", { class: "msg error" }, errorText(res))); return; }
+    model = { questions: res.questions.map(q => ({ id: q.id, text: q.text, answer: "" })), hint: res.hint, max: 3 };
+    paint(res.questions.length > 0);
+  }
+
+  function paint(has) {
+    const password = h("input", { type: "password", autocomplete: "current-password" });
+    const hint = h("textarea", { maxlength: String(200), rows: "2" }, model.hint);
+    const rows = model.questions.map((q, i) => {
+      const select = h("select", { onchange: () => { q.id = select.value; paint(has); } },
+        ["pet", "city", "game", "friend", "phone", "movie", "street"].map(id => h("option", { value: id }, tr("security.q." + id))),
+        h("option", { value: "custom" }, tr("security.q_custom")));
+      select.value = q.id;
+      const answer = h("input", { type: "text", autocomplete: "off", spellcheck: "false", maxlength: "64", value: q.answer, oninput: () => { q.answer = answer.value.replace(/\s+/g, "_"); if (answer.value !== q.answer) answer.value = q.answer; } });
+      const text = h("input", { type: "text", maxlength: "120", value: q.text, oninput: () => { q.text = text.value; } });
+      return h("div", { class: "step" },
+        h("div", { class: "step-head" }, h("b", {}, tr("security.q_n", { n: i + 1 })),
+          h("button", { class: "btn secondary small", type: "button", onclick: () => { model.questions.splice(i, 1); paint(has); } }, "×")),
+        field(tr("security.q_n", { n: i + 1 }), select),
+        q.id === "custom" ? field(tr("security.question_text"), text) : null,
+        field(tr("security.answer"), answer, tr("security.answer_hint")));
+    });
+    const add = model.questions.length < model.max
+      ? h("button", { class: "btn secondary", type: "button", onclick: () => { model.questions.push({ id: "pet", text: "", answer: "" }); paint(has); } }, tr("security.add"))
+      : null;
+    const save = h("button", { class: "btn", type: "button", onclick: async () => {
+      showError(error, "");
+      if (model.questions.some(q => !q.answer)) { showError(error, tr("security.fill")); return; }
+      save.disabled = true;
+      const res = await api("PUT", "/api/security", { password: password.value, hint: hint.value, questions: model.questions.map(q => ({ id: q.id, text: q.id === "custom" ? q.text : "", answer: q.answer })) });
+      save.disabled = false;
+      if (!res.ok) { showError(error, errorText(res)); return; }
+      password.value = "";
+      toast(tr("security.saved"), "ok");
+      load();
+    } }, tr("security.save"));
+    box.replaceChildren(
+      h("h3", {}, tr("security.title")), h("p", { class: "meta" }, tr("security.lead")),
+      has || model.questions.length ? null : h("div", { class: "msg info" }, tr("security.none")),
+      error, ...rows, add,
+      field(tr("security.hint"), hint, tr("security.hint_hint")),
+      field(tr("settings.password"), password), save);
+  }
+  load();
+  return box;
+}
+
+function consoleSection() {
+  const box = h("pre", { class: "console-box tall" }, "…");
+  const scope = h("select", {}, h("option", { value: "all" }, tr("console.scope_all")), h("option", { value: "session" }, tr("console.scope_session")));
+  const format = h("select", {}, ["txt", "json", "csv"].map(f => h("option", { value: f }, f.toUpperCase())));
+  async function refresh() {
+    const res = await api("GET", "/api/console?limit=100");
+    box.textContent = res.ok && res.lines.length ? res.lines.map(consoleLine).join("\n") : tr("console.empty");
+    box.scrollTop = box.scrollHeight;
+  }
+  refresh();
+  return h("div", { class: "section" }, h("h3", {}, tr("console.title")), h("p", { class: "meta" }, tr("console.hint", { n: 100 })), box,
+    h("div", { class: "row" }, field(tr("console.export"), scope), field(" ", format)),
+    h("div", { class: "actions" },
+      h("button", { class: "btn secondary", type: "button", onclick: refresh }, tr("console.refresh")),
+      h("button", { class: "btn", type: "button", onclick: () => { window.location.href = "/api/console/export?format=" + format.value + "&scope=" + scope.value; } }, tr("console.export"))));
+}
+
+function dataSection() {
+  const out = h("div", {});
+  const passphrase = h("input", { type: "password", autocomplete: "off" });
+  const file = h("input", { type: "file", accept: "application/json,.json" });
+
+  async function doExport() {
+    const res = await api("POST", "/api/data/export", { passphrase: passphrase.value });
+    if (!res.ok) { out.replaceChildren(h("div", { class: "msg error" }, errorText(res))); return; }
+    const blob = new Blob([JSON.stringify(res.export, null, 1)], { type: "application/json" });
+    const link = h("a", { href: URL.createObjectURL(blob), download: "mrbeast-gtfo-export.json" });
+    document.body.append(link);
+    link.click();
+    link.remove();
+    out.replaceChildren();
+  }
+
+  async function doImport() {
+    if (!file.files.length) { out.replaceChildren(h("div", { class: "msg error" }, tr("data.choose"))); return; }
+    let parsed;
+    try { parsed = JSON.parse(await file.files[0].text()); } catch (e) { out.replaceChildren(h("div", { class: "msg error" }, tr("err.import_invalid"))); return; }
+    const res = await api("POST", "/api/data/import", { export: parsed, passphrase: passphrase.value });
+    if (!res.ok) { out.replaceChildren(h("div", { class: "msg error" }, errorText(res))); return; }
+    out.replaceChildren(h("div", { class: "msg ok" }, tr("data.imported", { g: res.guilds, n: res.strikes })));
+  }
+
+  return h("div", { class: "section" }, h("h3", {}, tr("data.title")), h("p", { class: "meta" }, tr("data.hint")),
+    field(tr("data.passphrase"), passphrase),
+    h("div", { class: "actions" }, h("button", { class: "btn secondary", type: "button", onclick: doExport }, tr("data.export"))),
+    field(tr("data.file"), file),
+    h("div", { class: "actions" }, h("button", { class: "btn secondary", type: "button", onclick: doImport }, tr("data.import"))),
+    out);
+}
+
+const KIND_LIST = ["socks5", "http", "vless", "vmess", "trojan", "shadowsocks", "xray"];
+
+const NETWORKS = ["tcp", "ws", "grpc", "httpupgrade", "xhttp"];
+
+const FINGERPRINTS = ["", "chrome", "firefox", "safari", "ios", "android", "edge", "random", "randomized"];
+
+const SS_METHODS = ["aes-128-gcm", "aes-256-gcm", "chacha20-ietf-poly1305", "xchacha20-ietf-poly1305", "2022-blake3-aes-128-gcm", "2022-blake3-aes-256-gcm", "2022-blake3-chacha20-poly1305"];
+
+async function openProxyDialog(entryId, done) {
+  let data = { kind: "socks5", label: "", host: "", port: "", user: "", password: "" };
+  let kinds = KIND_LIST.filter(k => k !== "xray");
+  if (entryId) {
+    const res = await api("GET", "/api/proxy/" + encodeURIComponent(entryId));
+    if (!res.ok) { toast(errorText(res), "error"); return; }
+    data = res.fields;
+    kinds = ["socks5", "http"].includes(data.kind) ? ["socks5", "http"] : [data.kind];
+  }
+  const error = formError();
+  const fieldsBox = h("div", { class: "dialog-fields" });
+  const radios = h("div", { class: "radio-list" });
+
+  const close = () => { back.remove(); document.removeEventListener("keydown", onKey); };
+  const onKey = (event) => { if (event.key === "Escape") close(); };
+
+  function bound(name, type, options) {
+    const label = tr("proxy.f." + name);
+    let input;
+    if (type === "select") {
+      input = h("select", { onchange: () => { data[name] = input.value; if (["network", "security"].includes(name)) paintFields(); } }, options.map(o => h("option", { value: o }, o === "" ? "—" : o)));
+      input.value = data[name] ?? options[0];
+      if (data[name] === undefined || data[name] === null) data[name] = options[0];
+    } else if (type === "check") {
+      input = h("input", { type: "checkbox", onchange: () => { data[name] = input.checked; } });
+      input.checked = !!data[name];
+      return h("label", { class: "check" }, input, h("span", {}, label));
+    } else if (type === "area") {
+      input = h("textarea", { rows: "10", spellcheck: "false", oninput: () => { data[name] = input.value; } }, data[name] ?? "");
+    } else {
+      input = h("input", { type: type === "password" ? "text" : type, autocomplete: "off", spellcheck: "false", value: data[name] ?? "", oninput: () => { data[name] = input.value; } });
+    }
+    return field(label, input);
+  }
+
+  function streamFields() {
+    const out = [];
+    if (!data.network) data.network = "tcp";
+    if (!data.security) data.security = data.kind === "trojan" ? "tls" : "none";
+    out.push(bound("network", "select", NETWORKS), bound("security", "select", ["none", "tls", "reality"]));
+    if (data.security === "tls") out.push(bound("sni", "text"), bound("fp", "select", FINGERPRINTS), bound("alpn", "text"), bound("allow_insecure", "check"));
+    if (data.security === "reality") out.push(bound("sni", "text"), bound("fp", "select", FINGERPRINTS.filter(Boolean)), bound("pbk", "text"), bound("sid", "text"), bound("spx", "text"));
+    if (["ws", "httpupgrade", "xhttp"].includes(data.network)) out.push(bound("path", "text"), bound("host_header", "text"));
+    if (data.network === "grpc") out.push(bound("service", "text"), bound("mode", "select", ["gun", "multi"]));
+    if (data.network === "xhttp") out.push(bound("mode", "select", ["auto", "packet-up", "stream-up", "stream-one"]));
+    return out;
+  }
+
+  function paintFields() {
+    const kind = data.kind;
+    const nodes = [bound("label", "text")];
+    if (kind === "xray") {
+      nodes.push(bound("json", "area"));
+    } else {
+      nodes.push(h("h4", {}, tr("proxy.socket")), h("div", { class: "row" }, bound("host", "text"), bound("port", "number")));
+      if (kind === "socks5" || kind === "http") nodes.push(h("h4", {}, tr("proxy.account")), bound("user", "text"), bound("password", "password"));
+      if (kind === "shadowsocks") nodes.push(bound("method", "select", SS_METHODS), bound("password", "password"));
+      if (kind === "trojan") nodes.push(bound("password", "password"), ...streamFields());
+      if (kind === "vless") nodes.push(bound("id", "text"), bound("flow", "select", ["", "xtls-rprx-vision"]), bound("encryption", "text"), ...streamFields());
+      if (kind === "vmess") nodes.push(bound("id", "text"), bound("alter", "number"), bound("cipher", "select", ["auto", "aes-128-gcm", "chacha20-poly1305", "none", "zero"]), ...streamFields());
+    }
+    fieldsBox.replaceChildren(...nodes);
+  }
+
+  function paintRadios() {
+    radios.replaceChildren(...kinds.map(kind => {
+      const input = h("input", { type: "radio", name: "proxy-kind", value: kind, onchange: () => { data.kind = kind; if (!entryId) data = { ...data, network: undefined, security: undefined, mode: undefined }; paintFields(); } });
+      input.checked = data.kind === kind;
+      return h("label", { class: "radio" }, input, h("span", {}, tr("proxy.kind." + kind)));
+    }));
+  }
+
+  const save = h("button", { class: "btn link", type: "button", onclick: async () => {
+    showError(error, "");
+    save.disabled = true;
+    const body = { kind: data.kind, fields: data };
+    const res = entryId ? await api("PUT", "/api/proxy/" + encodeURIComponent(entryId), body) : await api("POST", "/api/proxy/form", body);
+    save.disabled = false;
+    if (!res.ok) { showError(error, errorText(res)); return; }
+    close();
+    done(res);
+  } }, tr("proxy.save"));
+
+  const back = h("div", { class: "modal-back", onclick: (event) => { if (event.target === back) close(); } },
+    h("div", { class: "modal", role: "dialog", "aria-modal": "true" },
+      h("h3", {}, tr(entryId ? "proxy.dialog_edit" : "proxy.dialog_add")),
+      radios, error, fieldsBox,
+      entryId ? null : h("p", { class: "meta" }, tr("proxy.mt_note")),
+      h("div", { class: "modal-actions" }, h("button", { class: "btn link", type: "button", onclick: close }, tr("proxy.cancel")), save)));
+  document.addEventListener("keydown", onKey);
+  document.body.append(back);
+  paintRadios();
+  paintFields();
 }
 
 function renderSettingsTab(content) {
@@ -1509,14 +2420,18 @@ function renderSettingsTab(content) {
     tokenSave
   );
 
-  content.replaceChildren(h("div", { class: "panel" },
-    h("div", { class: "section" }, h("h3", {}, tr("settings.languages")),
-      h("div", { class: "row" }, field(tr("settings.panel_lang"), panelLang), field(tr("settings.bot_lang"), botLang))),
-    moderatorSection(),
-    h("div", { class: "section" }, h("h3", {}, tr("settings.token")), h("p", { class: "meta" }, tr("settings.token_hint")), tokenForm),
-    updateSection(),
-    privacySection(),
-    proxySection()
+  content.replaceChildren(h("div", { class: "settings-grid" },
+    h("div", { class: "panel" },
+      h("div", { class: "section" }, h("h3", {}, tr("settings.languages")),
+        h("div", { class: "row" }, field(tr("settings.panel_lang"), panelLang), field(tr("settings.bot_lang"), botLang))),
+      securitySection(),
+      moderatorSection(),
+      h("div", { class: "section" }, h("h3", {}, tr("settings.token")), h("p", { class: "meta" }, tr("settings.token_hint")), tokenForm),
+      consoleSection(),
+      dataSection(),
+      privacySection()
+    ),
+    h("aside", { class: "settings-side" }, updateSection())
   ));
   renderModerator();
 }

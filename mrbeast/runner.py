@@ -7,6 +7,7 @@ import aiohttp
 import discord
 
 from .bot import GuardBot
+from .consolelog import console
 from .state import state
 
 logger = logging.getLogger("mrbeast.runner")
@@ -48,6 +49,7 @@ class BotRunner:
 
     async def start(self, token: str):
         await self.stop()
+        console.mark_activation()
         self.error = ""
         self.running = True
         self.stop_event = asyncio.Event()
@@ -69,7 +71,7 @@ class BotRunner:
             bot = GuardBot(proxy=url)
             self.bot = bot
             run = asyncio.create_task(bot.start(token))
-            watch = asyncio.create_task(pool.watch()) if url else None
+            watch = asyncio.create_task(pool.watch() if url else pool.wait_recovery()) if (url or pool.entries) else None
             try:
                 await asyncio.wait({t for t in (run, watch) if t}, return_when=asyncio.FIRST_COMPLETED)
             finally:
@@ -85,7 +87,7 @@ class BotRunner:
             if stop_event.is_set():
                 break
             if proxy_died:
-                logger.warning("Proxy stopped responding or got slow, choosing the best one again")
+                logger.warning("A proxy changed state (failed, slowed down or came back), choosing the best one again")
                 await pool.release()
                 delay = 5
                 continue

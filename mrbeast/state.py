@@ -1,6 +1,7 @@
 from .config import GlobalConfig, GuildSettings, ensure_dirs
 from .logstore import LogStore
 from .proxy import ProxyPool
+from .strikes import StrikeStore
 from .security import AuthStore, LoginLimiter, OneTimeCode, ResetFlow, Sessions
 
 
@@ -12,6 +13,7 @@ class State:
         self.auth = AuthStore()
         self.logs = LogStore(self.auth.fernet)
         self.proxies = ProxyPool(self.auth.fernet)
+        self.strikes = StrikeStore(self.auth.fernet)
         self.proxy_url = None
         self.sessions = Sessions()
         self.reg_code = OneTimeCode()

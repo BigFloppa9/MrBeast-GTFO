@@ -10,7 +10,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from .config import effective_reason
+from .config import MAX_BAN_DELETE_MINUTES, effective_reason, step_reason, steps_for
 from .i18n import t
 from .logstore import MAX_IMAGE_BYTES, MAX_IMAGES_PER_LOG, cut, save_image_async
 from .state import state
@@ -21,6 +21,8 @@ logger = logging.getLogger("mrbeast.bot")
 DISCORD_MAX_TIMEOUT = timedelta(days=28)
 MEDIA_DOMAINS = ("discordapp.com", "discordapp.net")
 MAX_DOWNLOADS = 12
+RETENTION_SCAN_DAYS = 90
+SCAN_LIMIT = 3000
 BULK_DELETE_AGE = timedelta(days=13)
 
 
@@ -95,30 +97,109 @@ async def capture_images(messages: list[discord.Message]) -> list[dict]:
         return []
 
 
-async def send_log(guild: discord.Guild, embed: discord.Embed):
+async def send_log(guild: discord.Guild, embed: discord.Embed) -> discord.Message | None:
     ch_id = state.settings.get(guild.id).get("log_channel", 0)
     if not ch_id:
-        return
+        return None
     ch = guild.get_channel(ch_id)
     if not ch:
-        return
+        return None
     perms = ch.permissions_for(guild.me)
     if not (perms.send_messages and perms.embed_links):
         logger.warning(f"Missing perms in log channel #{ch.name}")
-        return
+        return None
     try:
-        await ch.send(embed=embed)
+        return await ch.send(embed=embed)
     except (discord.Forbidden, discord.HTTPException) as e:
         logger.error(f"Log send error: {e}")
+        return None
+
+
+def embed_mentions(message: discord.Message, ids: set[str]) -> bool:
+    for embed in message.embeds:
+        texts = [embed.title or "", embed.description or "", embed.footer.text if embed.footer else ""]
+        texts += [f.value or "" for f in embed.fields]
+        blob = "\n".join(texts)
+        if any(i in blob for i in ids):
+            return True
+    return False
+
+
+async def scrub_discord_logs(bot: commands.Bot, ids: set[str], refs: list[dict]) -> dict:
+    result = {"deleted": 0, "scanned": 0, "skipped": False}
+    if not ids and not refs:
+        return result
+    if not bot or not bot.is_ready() or not bot.user:
+        result["skipped"] = True
+        return result
+    gone: set[int] = set()
+    for ref in refs:
+        try:
+            channel = bot.get_channel(int(ref["channel"])) or await bot.fetch_channel(int(ref["channel"]))
+            message = await channel.fetch_message(int(ref["message"]))
+        except (KeyError, ValueError, TypeError, discord.HTTPException):
+            continue
+        if message.author.id == bot.user.id:
+            try:
+                await message.delete()
+                gone.add(message.id)
+                result["deleted"] += 1
+            except discord.HTTPException:
+                pass
+    cutoff = datetime.now(timezone.utc) - timedelta(days=RETENTION_SCAN_DAYS)
+    for guild in bot.guilds:
+        channel_id = state.settings.get(guild.id).get("log_channel", 0)
+        channel = guild.get_channel(channel_id) if channel_id else None
+        if not isinstance(channel, discord.TextChannel) or not ids:
+            continue
+        if not channel.permissions_for(guild.me).read_message_history:
+            continue
+        try:
+            async for message in channel.history(limit=SCAN_LIMIT, after=cutoff):
+                result["scanned"] += 1
+                if message.id in gone or message.author.id != bot.user.id:
+                    continue
+                if embed_mentions(message, ids):
+                    try:
+                        await message.delete()
+                        result["deleted"] += 1
+                    except discord.HTTPException:
+                        pass
+                    await asyncio.sleep(0.4)
+        except discord.HTTPException as e:
+            logger.error(f"Log channel scan error in {guild.id}: {e}")
+    return result
 
 
 async def apply_timeout(guild: discord.Guild, target: discord.Member, s: dict) -> Exception | None:
     timeout_td = min(timedelta(minutes=s["timeout_duration"]), DISCORD_MAX_TIMEOUT)
     try:
-        await target.timeout(datetime.now(timezone.utc) + timeout_td, reason=effective_reason(s, lang()))
+        await target.timeout(datetime.now(timezone.utc) + timeout_td, reason=effective_reason(s, lang())[:512])
         return None
     except Exception as e:
         return e
+
+
+async def apply_step(guild: discord.Guild, target: discord.Member, step: dict, reason: str) -> Exception | None:
+    try:
+        if step["action"] == "ban":
+            seconds = min(step["delete"], MAX_BAN_DELETE_MINUTES) * 60
+            await guild.ban(target, reason=reason[:512], delete_message_seconds=seconds)
+        else:
+            timeout_td = min(timedelta(minutes=step["duration"]), DISCORD_MAX_TIMEOUT)
+            await target.timeout(datetime.now(timezone.utc) + timeout_td, reason=reason[:512])
+        return None
+    except Exception as e:
+        return e
+
+
+async def send_reason(guild: discord.Guild, target: discord.Member, reason: str):
+    if not state.settings.get(guild.id).get("dm_reason", True):
+        return
+    try:
+        await target.send(t(lang(), "dm_reason_title", server=guild.name, reason=reason)[:2000])
+    except (discord.Forbidden, discord.HTTPException):
+        pass
 
 
 async def delete_messages(ch, msgs: list[discord.Message]):
@@ -159,8 +240,9 @@ async def purge_messages(guild: discord.Guild, target: discord.Member, s: dict, 
     return deleted
 
 
-def build_embed(source: str, target: discord.Member, s: dict, deleted: int,
-                trigger_msg: discord.Message | None = None, moderator: discord.abc.User | None = None) -> discord.Embed:
+def build_embed(source: str, target: discord.Member, s: dict, deleted: int | None,
+                trigger_msg: discord.Message | None = None, moderator: discord.abc.User | None = None,
+                step: dict | None = None, strike: tuple[int, int] | None = None) -> discord.Embed:
     lg = lang()
     auto = source == "auto"
     embed = discord.Embed(
@@ -174,15 +256,18 @@ def build_embed(source: str, target: discord.Member, s: dict, deleted: int,
         embed.add_field(name=t(lg, "trigger"), value=f"[Jump]({trigger_msg.jump_url})\n{content}", inline=False)
     if moderator is not None:
         embed.add_field(name=t(lg, "moderator"), value=moderator.mention, inline=False)
-    deleted_line = (
-        t(lg, "deleted_auto", count=deleted, window=fmt_duration(s["delete_window"]))
-        if auto else t(lg, "deleted_manual", count=deleted)
-    )
-    embed.add_field(
-        name=t(lg, "action"),
-        value=f"{t(lg, 'timeout_line', duration=fmt_duration(s['timeout_duration']))}\n{deleted_line}",
-        inline=False,
-    )
+    step = step or {"action": "timeout", "duration": s["timeout_duration"], "delete": s["delete_window"]}
+    window = fmt_duration(step["delete"])
+    if step["action"] == "ban":
+        first_line = t(lg, "ban_line")
+        deleted_line = t(lg, "deleted_ban", window=window)
+    else:
+        first_line = t(lg, "timeout_line", duration=fmt_duration(step["duration"]))
+        deleted_line = t(lg, "deleted_auto", count=deleted, window=window) if auto else t(lg, "deleted_manual", count=deleted)
+    lines = [first_line, deleted_line]
+    if strike and strike[1] > 1:
+        lines.insert(0, t(lg, "strike_line", n=strike[0], total=strike[1]))
+    embed.add_field(name=t(lg, "action"), value="\n".join(lines), inline=False)
     if auto and trigger_msg is not None:
         embed.set_footer(text=f"#{trigger_msg.channel.name}")
     return embed
@@ -192,9 +277,10 @@ def person(user) -> dict:
     return {"display": cut(user.display_name), "username": cut(user.name), "id": str(user.id)}
 
 
-def record_log(source: str, guild: discord.Guild, target: discord.Member, s: dict, deleted: int,
+def record_log(source: str, guild: discord.Guild, target: discord.Member, s: dict, deleted: int | None,
                trigger_msg: discord.Message | None = None, images: list[dict] | None = None,
-               moderator: discord.abc.User | None = None):
+               moderator: discord.abc.User | None = None, step: dict | None = None,
+               strike: tuple[int, int] | None = None, message: discord.Message | None = None):
     trigger = None
     if trigger_msg is not None:
         trigger = {
@@ -209,9 +295,12 @@ def record_log(source: str, guild: discord.Guild, target: discord.Member, s: dic
         "offender": person(target),
         "moderator": person(moderator) if moderator is not None else None,
         "trigger": trigger,
-        "timeout": s["timeout_duration"],
+        "timeout": (step or {}).get("duration", s["timeout_duration"]) if (step or {}).get("action") != "ban" else 0,
         "deleted": deleted,
-        "window": s["delete_window"] if source == "auto" else None,
+        "window": (step or {}).get("delete", s["delete_window"]) if source == "auto" else None,
+        "action": (step or {}).get("action", "timeout"),
+        "strike": {"n": strike[0], "total": strike[1]} if strike else None,
+        "discord": {"channel": str(message.channel.id), "message": str(message.id)} if message is not None else None,
     })
 
 
@@ -258,23 +347,49 @@ class Guard(commands.Cog):
     def __init__(self, bot: "GuardBot"):
         self.bot = bot
         self.image_tracker = defaultdict(lambda: defaultdict(list))
-        self.processed_users = defaultdict(set)
+        self.busy: set[tuple[int, int]] = set()
+        self.cooldown: dict[tuple[int, int], float] = {}
         self.hinted: dict[int, float] = {}
 
     async def run_auto(self, guild: discord.Guild, target: discord.Member, trigger_msg: discord.Message, evidence: list):
         s = state.settings.get(guild.id)
-        err = await apply_timeout(guild, target, s)
+        steps = steps_for(s)
+        done = state.strikes.peek(guild.id, target.id, s["warn_reset_days"])
+        index = min(done, len(steps) - 1)
+        step = steps[index]
+        total = len(steps)
+        reason = step_reason(s, index, total, lang())
+        if step["action"] == "ban":
+            await send_reason(guild, target, reason)
+        err = await apply_step(guild, target, step, reason)
+        if err is None and step["action"] != "ban":
+            await send_reason(guild, target, reason)
         if err is not None:
             if isinstance(err, discord.Forbidden):
-                logger.warning(f"[auto] Cannot timeout {target}")
+                logger.warning(f"[auto] Cannot {step['action']} {target}")
             else:
-                logger.error(f"[auto] Timeout error: {err}")
+                logger.error(f"[auto] {step['action']} error: {err}")
             return
-        logger.info(f"[auto] Timed out {target}")
+        state.strikes.commit(guild.id, target.id, done + 1)
+        logger.info(f"[auto] {step['action']} applied to {target} (detection {index + 1}/{total})")
         images = await capture_images(evidence)
-        deleted = await purge_messages(guild, target, s, "auto")
-        await send_log(guild, build_embed("auto", target, s, deleted, trigger_msg=trigger_msg))
-        record_log("auto", guild, target, s, deleted, trigger_msg=trigger_msg, images=images)
+        deleted = None
+        if step["action"] != "ban":
+            window_settings = dict(s, delete_window=step["delete"])
+            deleted = await purge_messages(guild, target, window_settings, "auto")
+        strike = (index + 1, total)
+        message = await send_log(guild, build_embed("auto", target, s, deleted, trigger_msg=trigger_msg, step=step, strike=strike))
+        record_log("auto", guild, target, s, deleted, trigger_msg=trigger_msg, images=images, step=step, strike=strike, message=message)
+
+    async def guarded_auto(self, guild: discord.Guild, target: discord.Member, trigger_msg: discord.Message, evidence: list):
+        key = (guild.id, target.id)
+        try:
+            await self.run_auto(guild, target, trigger_msg, evidence)
+        except Exception as e:
+            logger.error(f"[auto] Unexpected error: {e!r}")
+        finally:
+            self.busy.discard(key)
+            self.cooldown[key] = time.monotonic() + 60
 
     async def dm_hint(self, message: discord.Message):
         now = time.monotonic()
@@ -305,7 +420,7 @@ class Guard(commands.Cog):
             return
 
         gid, uid = message.guild.id, message.author.id
-        if uid in self.processed_users[gid]:
+        if (gid, uid) in self.busy or self.cooldown.get((gid, uid), 0) > time.monotonic():
             return
 
         s = state.settings.get(gid)
@@ -319,13 +434,15 @@ class Guard(commands.Cog):
         logger.info(f"[Tracker] {message.author}: {len(tracker)} images in {len(unique_chs)} channels")
 
         if len(tracker) >= s["auto_min_images"] and len(unique_chs) >= s["auto_min_channels"]:
-            self.processed_users[gid].add(uid)
+            self.busy.add((gid, uid))
             evidence = [e["msg"] for e in tracker]
             self.image_tracker[gid][uid] = []
             logger.info(f"[AutoDetect] Triggered for {message.author}")
             member = message.guild.get_member(uid)
             if member:
-                asyncio.create_task(self.run_auto(message.guild, member, message, evidence))
+                asyncio.create_task(self.guarded_auto(message.guild, member, message, evidence))
+            else:
+                self.busy.discard((gid, uid))
 
     @app_commands.command(name="mrbeast", description="Timeout a compromised account and delete their messages")
     @app_commands.describe(target="User to timeout (@mention or ID)")
@@ -345,8 +462,8 @@ class Guard(commands.Cog):
             return
 
         deleted = await purge_messages(interaction.guild, target, s, "manual")
-        await send_log(interaction.guild, build_embed("manual", target, s, deleted, moderator=interaction.user))
-        record_log("manual", interaction.guild, target, s, deleted, moderator=interaction.user)
+        message = await send_log(interaction.guild, build_embed("manual", target, s, deleted, moderator=interaction.user))
+        record_log("manual", interaction.guild, target, s, deleted, moderator=interaction.user, message=message)
 
         await interaction.followup.send(
             t(lg, "manual_done", name=target.display_name, duration=fmt_duration(s["timeout_duration"]),
@@ -438,7 +555,9 @@ class Guard(commands.Cog):
             await interaction.response.send_message(t(lg, "dm_reg_bad"))
             return
         label = f"{interaction.user.display_name} ({interaction.user.name})"
-        state.config.set_moderator(interaction.user.id, cut(label, 100))
+        if not state.config.add_moderator(interaction.user.id, cut(label, 100)):
+            await interaction.response.send_message(t(lg, "dm_reg_full"))
+            return
         await interaction.response.send_message(t(lg, "dm_reg_ok"))
 
     @app_commands.command(name="log", description="Get a password reset code for the web panel (DM only)")
@@ -446,7 +565,7 @@ class Guard(commands.Cog):
     async def log(self, interaction: discord.Interaction):
         lg = lang()
         logger.info(f"[DM] /log from {interaction.user}")
-        if not state.config.moderator_id or interaction.user.id != state.config.moderator_id:
+        if not state.config.is_moderator(interaction.user.id):
             await interaction.response.send_message(t(lg, "dm_log_denied"))
             return
         code = state.reset.issue_code()

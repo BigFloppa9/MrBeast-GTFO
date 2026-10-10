@@ -6,14 +6,26 @@ import sys
 import urllib.error
 import urllib.request
 
-UA = "Happ/2.0.0"
-SCHEMES = ("vless://", "socks5://", "socks5h://", "http://")
+AGENTS = ("Happ/2.0.0", "v2rayN/7.8.2", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36", "curl/8.5.0")
+SCHEMES = ("vless://", "vmess://", "trojan://", "ss://", "socks5://", "socks5h://", "http://")
 
 
-def fetch(url: str, ua: str) -> str:
-    request = urllib.request.Request(url, headers={"User-Agent": ua})
-    with urllib.request.urlopen(request, timeout=30) as response:
-        return response.read(4 * 1024 * 1024).decode("utf-8", errors="replace")
+def fetch(url: str, ua: str | None) -> str:
+    last = None
+    for agent in ([ua] if ua else list(AGENTS)):
+        request = urllib.request.Request(url, headers={"User-Agent": agent})
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                body = response.read(4 * 1024 * 1024).decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as e:
+            last = e
+            continue
+        if body.lstrip()[:200].lower().startswith(("<!doctype", "<html")):
+            continue
+        return body
+    if last:
+        raise last
+    raise ValueError("the server returned a web page instead of a subscription")
 
 
 def decode(body: str) -> str:
@@ -32,7 +44,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Download a subscription link and print the servers it contains, ready to paste into the MrBeast GTFO panel (Settings, Proxy).")
     parser.add_argument("url", help="subscription link (https://...)")
     parser.add_argument("-o", "--out", help="write the result to a file instead of printing it")
-    parser.add_argument("--ua", default=UA, help="User-Agent sent to the provider (default: %(default)s)")
+    parser.add_argument("--ua", default=None, help="User-Agent sent to the provider (default: several are tried in turn)")
     args = parser.parse_args()
 
     try:

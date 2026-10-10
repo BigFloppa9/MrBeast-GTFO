@@ -1,23 +1,31 @@
 import asyncio
+import csv
+import io
+import json
 import logging
+import os
+import time
 from pathlib import Path
+from .config import BASE_DIR
 from urllib.parse import urlparse
 
 import discord
 from aiohttp import web
 
-from .bot import set_log_channel
-from .config import DEFAULT_REASON, LANGUAGES
+from . import __version__, happ_crypt
+from .bot import scrub_discord_logs, set_log_channel
+from .config import DEFAULT_REASON, LANGUAGES, MAX_STEPS, PRESETS, RETENTION_DAYS, effective_reason, ladder_steps, step_reason, steps_for
+from .consolelog import console
 from .logstore import read_image
 from .runner import clean_token, runner, validate_token
-from .security import CODE_TTL, MIN_PASSWORD_LENGTH
+from .security import CODE_TTL, MAX_HINT, MIN_PASSWORD_LENGTH, QUESTION_IDS
 from .images import cached_image
 from .network import lan_addresses
-from .proxy import fetch_subscription, parse_subscription, parse_text
+from .proxy import FORM_KINDS, ParseError, SubError, entry_fields, entry_from_fields, load_subscription, parse_input, resolve_url
 from .state import state
 from .theme import CONTENT_TYPES as BG_TYPES, ensure_background
-from .updater import apply as apply_update, check as check_update
-from .utils import apply_patch, fmt_duration
+from .updater import apply as apply_update, check as check_update, history as update_history
+from .utils import apply_patch, fmt_duration, sanitize_settings
 
 logger = logging.getLogger("mrbeast.web")
 
@@ -25,7 +33,7 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 COOKIE = "mb_session"
 PUBLIC_API = {
     "/api/state", "/api/setup", "/api/login", "/api/kos-bg",
-    "/api/forgot/start", "/api/forgot/verify", "/api/forgot/finish",
+    "/api/forgot/start", "/api/forgot/verify", "/api/forgot/finish", "/api/forgot/answers",
 }
 CSP = (
     "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
@@ -151,7 +159,9 @@ async def api_login(request: web.Request):
     good = isinstance(password, str) and await asyncio.to_thread(state.auth.verify_password, password)
     if not good:
         state.limiter.fail(key)
-        return fail("bad_password", 401)
+        attempts = state.limiter.count(key)
+        hint = state.auth.recovery_view()["hint"] if attempts >= 2 else ""
+        return fail("bad_password", 401, attempts=attempts, hint=hint)
     state.limiter.reset(key)
     response = ok()
     attach_session(response)
@@ -165,13 +175,38 @@ async def api_logout(request: web.Request):
     return response
 
 
+def reinstall_info() -> dict:
+    termux = bool(os.environ.get("TERMUX_VERSION"))
+    name = BASE_DIR.name
+    parent = "~" if termux and BASE_DIR.parent == Path.home() else str(BASE_DIR.parent)
+    install = "pkg install -y git && " if termux else ""
+    command = f'cd {parent} && rm -rf "{name}" && {install}git clone https://github.com/BigFloppa9/MrBeast-GTFO "{name}" && cd "{name}" && bash install.sh'
+    return {"env": "termux" if termux else "other", "command": command}
+
+
 async def api_forgot_start(request: web.Request):
     if not state.auth.configured:
         return fail("not_configured", 409)
-    linked = bool(state.config.moderator_id)
+    linked = bool(state.config.moderators)
     if linked:
         state.reset.open()
-    return ok(linked=linked)
+    questions = state.auth.recovery_view()["questions"]
+    extra = {} if linked or questions else {"reinstall": reinstall_info()}
+    return ok(linked=linked, questions=questions, **extra)
+
+
+async def api_forgot_answers(request: web.Request):
+    key = "reset:" + (request.remote or "unknown")
+    locked = state.limiter.locked_for(key)
+    if locked:
+        return fail("locked", 429, seconds=locked)
+    data = await read_body(request)
+    good = await asyncio.to_thread(state.auth.verify_answers, data.get("answers"))
+    if not good:
+        state.limiter.fail(key)
+        return fail("answers_invalid", 400)
+    state.limiter.reset(key)
+    return ok(reset_token=state.reset.grant())
 
 
 async def api_forgot_verify(request: web.Request):
@@ -204,11 +239,7 @@ async def api_status(request: web.Request):
     return ok(
         bot=runner.snapshot(),
         config={"bot_lang": state.config.bot_lang, "panel_lang": state.config.panel_lang},
-        moderator={
-            "linked": bool(state.config.moderator_id),
-            "name": state.config.moderator_name,
-            "id": str(state.config.moderator_id) if state.config.moderator_id else "",
-        },
+        moderators=[{"id": str(m["id"]), "name": m["name"]} for m in state.config.moderators],
         reg={"active": state.reg_code.active(), "remaining": state.reg_code.remaining()},
         network={"port": state.port, "addresses": lan_addresses()},
         bot_state=state.config.bot_state,
@@ -249,6 +280,16 @@ def find_guild(request: web.Request) -> discord.Guild | None:
         return None
 
 
+def preview_steps(s: dict) -> dict:
+    lg = state.config.bot_lang
+    shown = {}
+    for preset in ("ladder", "ladder_ban"):
+        trial = dict(s, punish_preset=preset)
+        steps = steps_for(trial)
+        shown[preset] = [dict(step, reason=step_reason(trial, i, len(steps), lg)) for i, step in enumerate(steps)]
+    return shown
+
+
 def serialize_settings(guild: discord.Guild) -> dict:
     s = state.settings.get(guild.id)
     reason = s.get("timeout_reason") or ""
@@ -262,6 +303,12 @@ def serialize_settings(guild: discord.Guild) -> dict:
         "auto_min_channels": s["auto_min_channels"],
         "auto_window_seconds": s["auto_window_seconds"],
         "log_channel": str(s["log_channel"] or ""),
+        "punish_preset": s["punish_preset"],
+        "custom_steps": s["custom_steps"],
+        "warn_reset_days": s["warn_reset_days"],
+        "dm_reason": bool(s["dm_reason"]),
+        "preview": preview_steps(s),
+        "max_steps": MAX_STEPS,
     }
 
 
@@ -344,12 +391,32 @@ async def api_moderator_code(request: web.Request):
     return ok(code=state.reg_code.issue(), ttl=CODE_TTL)
 
 
+async def api_moderator_delete(request: web.Request):
+    try:
+        user_id = int(request.match_info["uid"])
+    except ValueError:
+        return fail("moderator_missing", 404)
+    if not state.config.remove_moderator(user_id):
+        return fail("moderator_missing", 404)
+    return ok(moderators=[{"id": str(m["id"]), "name": m["name"]} for m in state.config.moderators])
+
+
 async def api_erase(request: web.Request):
     data = await read_body(request)
     query = str(data.get("query") or "").strip()
     if not query.lstrip("@"):
         return fail("query_empty")
-    return ok(count=state.logs.erase(query, bool(data.get("confirm"))))
+    confirm = bool(data.get("confirm"))
+    found = state.logs.matches(query)
+    count = state.logs.erase(query, False)
+    strikes = sum(1 for users in state.strikes.data.values() for uid in users if uid in found["ids"])
+    if not confirm:
+        return ok(count=count + strikes, strikes=strikes)
+    count = state.logs.erase(query, True)
+    removed = state.strikes.forget(found["ids"])
+    console.scrub(found["ids"] | found["names"] | ({query.lstrip("@")} if len(query.lstrip("@")) >= 3 else set()))
+    scrubbed = await scrub_discord_logs(runner.bot, found["ids"], found["refs"])
+    return ok(count=count + removed, strikes=removed, discord=scrubbed)
 
 
 async def api_update_check(request: web.Request):
@@ -366,6 +433,111 @@ async def api_update_apply(request: web.Request):
         return fail("update_running", 409)
     asyncio.create_task(apply_update())
     return ok()
+
+
+async def api_update_info(request: web.Request):
+    result = await update_history()
+    return ok(**{k: v for k, v in result.items() if k != "ok"}, git=result["ok"])
+
+
+async def api_console(request: web.Request):
+    try:
+        limit = max(1, min(int(request.query.get("limit", "100")), 500))
+    except ValueError:
+        limit = 100
+    return ok(lines=console.lines(limit))
+
+
+def console_text(item: dict) -> str:
+    stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(item["ts"]))
+    return f"{stamp} {item['level']} {item['name']}: {item['msg']}"
+
+
+async def api_console_export(request: web.Request):
+    fmt = request.query.get("format", "txt")
+    items = console.lines(0, request.query.get("scope") == "session")
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    if fmt == "json":
+        body, kind, ext = json.dumps(items, ensure_ascii=False, indent=1), "application/json", "json"
+    elif fmt == "csv":
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(["time", "level", "logger", "message"])
+        for item in items:
+            writer.writerow([time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(item["ts"])), item["level"], item["name"], item["msg"]])
+        body, kind, ext = buffer.getvalue(), "text/csv", "csv"
+    else:
+        body, kind, ext = "\n".join(console_text(i) for i in items) + "\n", "text/plain", "txt"
+    return web.Response(
+        body=body.encode("utf-8"),
+        headers={"Content-Type": kind + "; charset=utf-8", "Content-Disposition": f'attachment; filename="mrbeast-console-{stamp}.{ext}"'},
+    )
+
+
+async def api_security_get(request: web.Request):
+    return ok(**state.auth.recovery_view(), ids=list(QUESTION_IDS), max_hint=MAX_HINT, linked=bool(state.config.moderators))
+
+
+async def api_security_put(request: web.Request):
+    key = "security:" + (request.remote or "unknown")
+    locked = state.limiter.locked_for(key)
+    if locked:
+        return fail("locked", 429, seconds=locked)
+    data = await read_body(request)
+    password = data.get("password")
+    if not (isinstance(password, str) and await asyncio.to_thread(state.auth.verify_password, password)):
+        state.limiter.fail(key)
+        return fail("bad_password", 401)
+    state.limiter.reset(key)
+    questions = data.get("questions")
+    hint = data.get("hint")
+    if not isinstance(questions, list) or not all(isinstance(q, dict) for q in questions) or not isinstance(hint, str):
+        return fail("bad_request")
+    error = await asyncio.to_thread(state.auth.set_recovery, questions, hint)
+    if error:
+        return fail(error)
+    return ok(**state.auth.recovery_view())
+
+
+async def api_data_export(request: web.Request):
+    data = await read_body(request)
+    passphrase = data.get("passphrase")
+    if not isinstance(passphrase, str) or len(passphrase) < 6:
+        return fail("passphrase_short")
+    state.strikes.expire({str(gid): s["warn_reset_days"] for gid, s in state.settings.data.items()})
+    block = await asyncio.to_thread(state.strikes.export_block, passphrase)
+    settings = {str(gid): s for gid, s in state.settings.data.items()}
+    return ok(export={
+        "app": "mrbeast-gtfo", "format": 1, "version": __version__, "exported": int(time.time()),
+        "config": {"bot_lang": state.config.bot_lang, "panel_lang": state.config.panel_lang},
+        "settings": settings, "strikes": block,
+    })
+
+
+async def api_data_import(request: web.Request):
+    data = await read_body(request)
+    export, passphrase = data.get("export"), data.get("passphrase")
+    if not isinstance(export, dict) or export.get("app") != "mrbeast-gtfo" or export.get("format") != 1 or not isinstance(passphrase, str):
+        return fail("import_invalid")
+    incoming = export.get("settings")
+    if not isinstance(incoming, dict):
+        return fail("import_invalid")
+    cleaned = {}
+    for gid, raw in incoming.items():
+        if str(gid).isdigit():
+            cleaned[int(gid)] = sanitize_settings(raw)
+    resets = {str(g): s["warn_reset_days"] for g, s in cleaned.items()}
+    for g, s in state.settings.data.items():
+        resets.setdefault(str(g), s["warn_reset_days"])
+    try:
+        merged = await asyncio.to_thread(state.strikes.import_block, export.get("strikes") or {}, passphrase, resets)
+    except ValueError as e:
+        return fail(str(e))
+    state.settings.data.update(cleaned)
+    state.settings.save()
+    cfg = export.get("config") if isinstance(export.get("config"), dict) else {}
+    state.config.set_languages(bot_lang=cfg.get("bot_lang"), panel_lang=cfg.get("panel_lang"))
+    return ok(guilds=len(cleaned), strikes=merged)
 
 
 async def api_update_status(request: web.Request):
@@ -417,13 +589,9 @@ async def read_subscription(url: str):
     if not url.lower().startswith(("http://", "https://")) or len(url) > 2000:
         return None, fail("sub_invalid")
     try:
-        body = await fetch_subscription(url, state.proxy_url)
-    except RuntimeError as e:
-        return None, fail("sub_fetch_failed", detail=str(e))
-    entries, skipped = parse_subscription(body)
-    if not entries:
-        return None, fail("sub_empty", skipped=skipped)
-    return (entries, skipped), None
+        return await load_subscription(url, state.proxy_url, state.config.hwid), None
+    except SubError as e:
+        return None, fail(e.code, detail=e.detail)
 
 
 async def api_sub_add(request: web.Request):
@@ -432,7 +600,8 @@ async def api_sub_add(request: web.Request):
     if error:
         return error
     entries, skipped = parsed
-    state.proxies.set_subscription(url, entries)
+    known = next((x for x in state.proxies.subs if x["url"] == url), None)
+    state.proxies.set_subscription(url, entries, known["id"] if known else None)
     await restart_bot()
     return ok(skipped=skipped, **state.proxies.view())
 
@@ -463,14 +632,56 @@ async def api_proxy_get(request: web.Request):
 
 async def api_proxy_add(request: web.Request):
     data = await read_body(request)
-    entries, errors = parse_text(str(data.get("text") or ""))
-    if not entries:
-        return fail("proxy_invalid", errors=errors)
-    added = state.proxies.add(entries)
+    entries, errors, subs = parse_input(str(data.get("text") or ""))
+    added = state.proxies.add(entries) if entries else 0
+    full = bool(entries) and not added
+    for n, url in subs:
+        try:
+            url = await resolve_url(url, state.proxy_url)
+            loaded, _ = await load_subscription(url, state.proxy_url, state.config.hwid)
+        except SubError as e:
+            errors.append({"code": e.code, "n": n, "detail": e.detail})
+            continue
+        known = next((x for x in state.proxies.subs if x["url"] == url), None)
+        sub = state.proxies.set_subscription(url, loaded, known["id"] if known else None)
+        added += sub.get("count", 0)
+        if len(loaded) > sub.get("count", 0):
+            errors.append({"code": "sub_truncated", "n": n, "detail": str(len(loaded) - sub.get("count", 0))})
     if not added:
-        return fail("proxy_limit")
+        return fail("proxy_limit" if full else "proxy_invalid", errors=errors)
     await restart_bot()
     return ok(added=added, errors=errors, **state.proxies.view())
+
+
+async def api_proxy_form_add(request: web.Request):
+    data = await read_body(request)
+    try:
+        entry = entry_from_fields(str(data.get("kind") or ""), data.get("fields"))
+    except ParseError as e:
+        return fail(e.code)
+    if not state.proxies.add([entry]):
+        return fail("proxy_limit")
+    await restart_bot()
+    return ok(**state.proxies.view())
+
+
+async def api_proxy_item(request: web.Request):
+    entry = next((e for e in state.proxies.entries if e["id"] == request.match_info["pid"]), None)
+    if entry is None:
+        return fail("proxy_missing", 404)
+    return ok(fields=entry_fields(entry), kinds=list(FORM_KINDS))
+
+
+async def api_proxy_edit(request: web.Request):
+    data = await read_body(request)
+    try:
+        fresh = entry_from_fields(str(data.get("kind") or ""), data.get("fields"))
+    except ParseError as e:
+        return fail(e.code)
+    if not state.proxies.replace(request.match_info["pid"], fresh):
+        return fail("proxy_missing", 404)
+    await restart_bot()
+    return ok(**state.proxies.view())
 
 
 async def api_proxy_delete(request: web.Request):
@@ -481,7 +692,7 @@ async def api_proxy_delete(request: web.Request):
 
 
 def create_app() -> web.Application:
-    app = web.Application(middlewares=[guard], client_max_size=1024 * 512)
+    app = web.Application(middlewares=[guard], client_max_size=1024 * 1024)
     app.router.add_get("/", index)
     app.router.add_get("/static/{name}", static_file)
     app.router.add_get("/api/state", api_state)
@@ -491,6 +702,15 @@ def create_app() -> web.Application:
     app.router.add_post("/api/forgot/start", api_forgot_start)
     app.router.add_post("/api/forgot/verify", api_forgot_verify)
     app.router.add_post("/api/forgot/finish", api_forgot_finish)
+    app.router.add_post("/api/forgot/answers", api_forgot_answers)
+    app.router.add_get("/api/security", api_security_get)
+    app.router.add_put("/api/security", api_security_put)
+    app.router.add_get("/api/console", api_console)
+    app.router.add_get("/api/console/export", api_console_export)
+    app.router.add_post("/api/data/export", api_data_export)
+    app.router.add_post("/api/data/import", api_data_import)
+    app.router.add_get("/api/update/info", api_update_info)
+    app.router.add_delete("/api/moderator/{uid}", api_moderator_delete)
     app.router.add_get("/api/status", api_status)
     app.router.add_get("/api/logs", api_logs)
     app.router.add_get("/api/image/{name}", api_image)
@@ -509,6 +729,9 @@ def create_app() -> web.Application:
     app.router.add_delete("/api/proxy/sub/{sid}", api_sub_delete)
     app.router.add_get("/api/proxy", api_proxy_get)
     app.router.add_post("/api/proxy", api_proxy_add)
+    app.router.add_post("/api/proxy/form", api_proxy_form_add)
+    app.router.add_get("/api/proxy/{pid}", api_proxy_item)
+    app.router.add_put("/api/proxy/{pid}", api_proxy_edit)
     app.router.add_delete("/api/proxy/{pid}", api_proxy_delete)
     app.router.add_get("/api/update/check", api_update_check)
     app.router.add_post("/api/update/apply", api_update_apply)

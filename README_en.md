@@ -142,10 +142,11 @@ For the bot to grant itself access to the log channel, additionally give it **Ma
 
 | Section | Contents |
 |---|---|
-| **Logs** | Latest records as Discord-style messages: offender display name, username and ID, trigger text, channel link, images (identical ones stored once), action. Updates automatically |
+| **Offenders** | Latest records as Discord-style messages: offender display name, username and ID, trigger text, channel link, images (identical ones stored once), action. Updates automatically |
 | **Status** | Bot state, ping, uptime, control buttons, panel addresses on the network |
-| **Servers** | The server list and per server: timeout reason, duration, delete period, log channel, auto-detection thresholds |
-| **Settings** | Languages, administrator account link, token replacement, updates, removal of a user's data, proxy |
+| **Servers** | The server list and per server (Telegram-style picker with smart search): punishment preset, steps, reasons, detection reset period, log channel, auto-detection thresholds |
+| **Proxy** | Proxy and subscription list, state of each entry, time of the last check |
+| **Settings** | Languages, administrator account link, token replacement, updates, removal of a user's data |
 
 In the panel logs, offender fields, trigger text and channel names are cut to 69 characters so spam can't bloat the history. Videos are not saved. Records are kept for at most 30 days (and at most 300 records).
 
@@ -153,7 +154,7 @@ In the panel logs, offender fields, trigger text and channel names are cut to 69
 
 The link is required to recover the password.
 
-1. In the panel open **Settings → Moderator account → Generate code**.
+1. In the panel open **Settings → Moderator accounts → Generate code**. Up to 10 accounts can be linked by repeating the steps; accounts are unlinked in the same place.
 2. Send the bot the command `/reg CODE` in **DIRECT** messages. The bot checks that you are an administrator (or the owner) of a server it works on and links your account by ID.
 
 If the password is lost:
@@ -162,7 +163,9 @@ If the password is lost:
 2. Send the bot the command `/log` (no code) in **DIRECT** messages. The bot replies with a code to the linked account only.
 3. Enter the code in the browser, then enter the new password twice.
 
-If no account was linked, stop the panel, delete `data/auth.json` and start the bot again: the setup runs from scratch.
+Without a linked account the password can be recovered with **security questions**: in **Settings → Password recovery** choose up to 3 questions (ready-made or your own); answers are written in Latin letters without spaces (use `_`) and stored only as hashes. A hint shown under the password field after two wrong attempts is set there too. On the sign-in page the password field is cleared after a wrong password.
+
+If neither a linked account nor questions exist, the recovery page shows the command that reinstalls the bot for your device (Termux or other). Reinstalling deletes all bot data.
 
 <h3 align="center">Bot control</h3>
 
@@ -170,12 +173,12 @@ The bot status (online, paused, stopped) is always shown at the top of the panel
 
 <h3 align="center">Proxy (if Discord is blocked)</h3>
 
-In **Settings → Proxy** you can add up to 100 entries as links or configs, and also a **subscription link**.
+In the **Proxy** tab you can add up to 100 entries: links, configs and subscription links go into one field.
 
 - On every connection the bot checks **all** entries, connects to the fastest one and chooses again if it stops responding. If the selected entry's ping is above 1000 ms the bot looks for a faster one; if there is none, it stays on the fastest available.
 - If no entry works, the bot connects **directly**.
-- In the background, every 10 minutes all entries (including unused ones) are checked, and the "not working" status turns into "works" when a server comes back.
-- An entry that does not respond for more than a day is removed from the list automatically.
+- In the background, every 10 minutes all entries (including unused ones) are checked. If the bot is connected directly and some entry comes back, it switches to it by itself.
+- An entry that does not respond for a total of one day is removed from the list automatically. The time is counted only while the device has internet: short network drops and phone sleep are not counted.
 
 Accepted (one link per line, or one or several configs in a row):
 
@@ -185,9 +188,10 @@ Accepted (one link per line, or one or several configs in a row):
 | HTTP | `http://host:3128` |
 | VLESS (link) | `vless://uuid@host:443?type=tcp&security=reality&pbk=…&sid=…&flow=xtls-rprx-vision#name` |
 | Xray / V2Ray config (JSON) | a full config from an app, for example a v2rayNG export |
-| Subscription | `https://provider/sub/…`: the bot downloads the server list, the "Update" button re-reads it |
+| VMess, Trojan, Shadowsocks | `vmess://…`, `trojan://…`, `ss://…` |
+| Subscription | `https://provider/sub/…` (or `happ://add/…`, `v2raytun://import/…`, `clash://install-config?url=…`): the bot downloads the server list, the "Update" button re-reads it |
 
-VLESS links support the `tcp`, `ws`, `grpc`, `httpupgrade` and `xhttp` transports and `none`, `tls`, `reality` security. For a JSON config the outbound proxy is taken (the one tagged `proxy`, or the first suitable one); other Xray protocols in such a config work too. Subscription entries of other types (vmess, trojan, etc.) are skipped.
+VLESS links support the `tcp`, `ws`, `grpc`, `httpupgrade` and `xhttp` transports and `none`, `tls`, `reality` security. For a JSON config the outbound proxy is taken (the one tagged `proxy`, or the first suitable one); other Xray protocols in such a config work too. Subscription entries of other types (hysteria, tuic, etc.) are skipped. A subscription is requested with several User-Agent headers in turn (Happ, v2rayN, a browser, curl), because providers answer different clients differently. Encrypted `happ://crypt5/…` links are decrypted locally with keys from a public list (github.com/cylaro/happ-decrypt, downloaded once into `data/cache`); the subscription itself is never sent anywhere. Older `crypt`, `crypt2`–`crypt4` are not supported. sing-box configs (the `outbounds` field), several configs in a row and `tg://socks` links are accepted as well. Telegram MTProto proxies (`tg://proxy`) cannot carry Discord traffic and are rejected. The list limit is 1000 entries. Each entry has an editor (pencil) and there is a form for adding without links.
 
 For SOCKS5, VLESS and configs the bot uses the **Xray** core. It is downloaded automatically from GitHub on first use (with a checksum check) to `data/bin/xray`. If GitHub is unavailable, put the `xray` file into that folder manually. Entries and subscription links are stored in `data/proxies.json` in encrypted form.
 
@@ -197,7 +201,7 @@ For SOCKS5, VLESS and configs the bot uses the **Xray** core. It is downloaded a
 python tools/subscription.py "https://provider/sub/…" -o servers.txt
 ```
 
-`servers.txt` contains the server links: open it and paste the content into the Proxy field in the panel.
+`servers.txt` contains the server links: open it and paste the content into the field in the Proxy tab.
 
 <h3 align="center">Updating from the panel</h3>
 
@@ -207,7 +211,26 @@ python tools/subscription.py "https://provider/sub/…" -o servers.txt
 
 <h3 align="center">Removing a user's data</h3>
 
-In **Settings → Remove user data** enter the username (not the display name) or the ID. The panel shows the number of matching records. After confirmation, the display name, username and ID in those records are replaced with `null`, and the stored message text and images are removed. A record with ID `null` is considered erased; a user whose name is literally "null" is not. Copies of reports in Discord itself (the log channel) are deleted by server administrators manually.
+In **Settings → Remove user data** enter the username (not the display name) or the ID. The panel shows the number of matching records. After confirmation, the display name, username and ID in those records are replaced with `null`, and the stored message text and images are removed; detection counters and console log lines mentioning the user are erased as well. A record with ID `null` is considered erased; a user whose name is literally "null" is not. The bot also deletes **its own** log messages about that user in the log channels of all servers (using the saved message references and by reading the channel history for 90 days); other messages are never touched. If the bot is offline, the Discord channels are not checked.
+
+<h3 align="center">Punishments, presets and counters</h3>
+
+In the **Servers** tab each server gets a preset:
+
+| Preset | What it does |
+|---|---|
+| One action (as before) | timeout and message deletion with the configured values on every detection |
+| Escalation | 1st detection: 5 min timeout and deletion for 1 h; 2nd: 1 day and 1 day; 3rd: 1 week and 1 day; 4th and later: ban and deletion for 1 day. The reason gets the detection number and a request to contact a moderator if it was a mistake |
+| Ban at the first detection | ban and deletion of messages for 1 day |
+| Custom | up to 8 steps: action (timeout or ban), length, deletion period and reason for each |
+
+The detection counter is kept per user per server and resets after the configured number of days without violations (30 by default, 90 at most). Nothing is stored longer than 90 days. The reason is sent to the offender in a direct message (can be turned off) and written to the audit log. On a ban Discord deletes messages for the chosen period (7 days at most).
+
+<h3 align="center">Settings transfer, console log, updates</h3>
+
+- **Settings → Transfer settings** saves server settings, presets, reasons and counters to a file. User IDs in the counters are encrypted with a passphrase, offenders and logs are not included, and records older than 90 days are dropped on import.
+- **Settings → Console log** shows the last 100 lines; export as txt, json or csv, for everything stored or since the last bot start. The file `data/console.log` keeps up to 2000 lines for 30 days.
+- The version block at the top right of **Settings**: "Show changes" expands the latest commits (needs a git installation), "Check for update" runs the usual check.
 
 ---
 
@@ -253,7 +276,7 @@ The token, logs and images are encrypted (Fernet) and the key sits in a separate
 
 | Problem | Solution |
 |---|---|
-| The panel says Discord can't be reached | Discord may be blocked by your provider: add a proxy in **Settings → Proxy** or turn on a VPN on the device. The bot keeps retrying |
+| The panel says Discord can't be reached | Discord may be blocked by your provider: add a proxy in the **Proxy** tab or turn on a VPN on the device. The bot keeps retrying |
 | "Discord rejected this token" | The token was copied partially or has been reset. Get a new one in the Developer Portal and replace it in Settings |
 | The panel mentions Intents | Enable **Server Members Intent** and **Message Content Intent**, then restart the bot |
 | The bot is silent in direct messages | Pick `/reg` and `/log` from the list that appears after typing `/`; plain text is ignored and answered with a hint. If the list is empty, restart Discord |

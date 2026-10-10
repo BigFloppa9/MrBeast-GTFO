@@ -171,6 +171,36 @@ class LogStore:
             self.cleanup_images(force=True)
         return hits
 
+    def matches(self, query: str) -> dict:
+        q = query.strip().lstrip("@")
+        ids, names, refs = set(), set(), []
+        if not q:
+            return {"ids": ids, "names": names, "refs": refs}
+        if q.isdigit():
+            ids.add(q)
+
+        def same(person) -> bool:
+            if not isinstance(person, dict):
+                return False
+            ident, name = person.get("id"), person.get("username")
+            return (isinstance(ident, str) and ident == q) or (isinstance(name, str) and name.lower() == q.lower())
+
+        for entry in self.entries:
+            hit = False
+            for key in ("offender", "moderator"):
+                person = entry.get(key)
+                if same(person):
+                    hit = True
+                    for field in ("id",):
+                        if person.get(field):
+                            ids.add(person[field])
+                    for field in ("username", "display"):
+                        if person.get(field):
+                            names.add(person[field])
+            if hit and isinstance(entry.get("discord"), dict):
+                refs.append(entry["discord"])
+        return {"ids": ids, "names": names, "refs": refs}
+
     def cleanup_images(self, force: bool = False):
         ensure_dirs()
         used = set()

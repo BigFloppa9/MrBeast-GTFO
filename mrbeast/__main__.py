@@ -7,6 +7,7 @@ import sys
 from aiohttp import web
 
 from .config import BASE_DIR
+from .consolelog import console
 from .network import lan_addresses
 from .state import state
 from .runner import runner
@@ -77,6 +78,19 @@ class QuietReconnects(logging.Filter):
         return True
 
 
+async def housekeeping(stop: asyncio.Event):
+    while not stop.is_set():
+        try:
+            state.strikes.expire({str(g): s["warn_reset_days"] for g, s in state.settings.data.items()})
+            state.logs.expire()
+        except Exception as e:
+            logging.getLogger("mrbeast.housekeeping").error(f"Cleanup failed: {e!r}")
+        try:
+            await asyncio.wait_for(stop.wait(), 3600)
+        except asyncio.TimeoutError:
+            pass
+
+
 async def watch_network(port: int, stop: asyncio.Event):
     known = {item["ip"] for item in lan_addresses()}
     text = BANNER[state.config.panel_lang]
@@ -96,6 +110,7 @@ async def watch_network(port: int, stop: asyncio.Event):
 async def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     logging.getLogger("aiohttp.access").setLevel(logging.WARNING)
+    logging.getLogger().addHandler(console)
     quiet = QuietReconnects()
     for handler in logging.getLogger().handlers:
         handler.addFilter(quiet)
@@ -124,7 +139,7 @@ async def main():
 
     stop = asyncio.Event()
     state.stop_event = stop
-    background = [asyncio.create_task(watch_network(port, stop)), asyncio.create_task(state.proxies.maintain(stop))]
+    background = [asyncio.create_task(watch_network(port, stop)), asyncio.create_task(state.proxies.maintain(stop)), asyncio.create_task(housekeeping(stop))]
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:

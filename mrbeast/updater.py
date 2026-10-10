@@ -70,6 +70,20 @@ async def check() -> dict:
     }
 
 
+async def history(limit: int = 6) -> dict:
+    code, head, _ = await run("git", "rev-parse", "--short", "HEAD")
+    if code:
+        return {"ok": False, "error": "not_git", "version": __version__}
+    _, raw, _ = await run("git", "log", "-n", str(limit), "--pretty=format:%x1e%h%x1f%cs%x1f%s%x1f%b")
+    commits = []
+    for chunk in raw.split("\x1e"):
+        if not chunk.strip():
+            continue
+        parts = (chunk.split("\x1f") + ["", "", "", ""])[:4]
+        commits.append({"hash": parts[0].strip(), "date": parts[1].strip(), "title": parts[2].strip(), "body": parts[3].strip()})
+    return {"ok": True, "version": __version__, "head": head, "commits": commits}
+
+
 async def rollback(old: str):
     if old:
         await run("git", "reset", "--hard", old)
