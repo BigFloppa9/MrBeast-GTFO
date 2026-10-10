@@ -61,7 +61,7 @@ DEFAULT_SETTINGS = {
     "punish_preset": "default",
     "custom_steps": [],
     "warn_reset_days": 30,
-    "dm_reason": True,
+    "dm_notify": False,
 }
 
 APPEAL_NOTE = {

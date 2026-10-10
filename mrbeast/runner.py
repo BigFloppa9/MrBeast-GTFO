@@ -139,13 +139,16 @@ class BotRunner:
         bot = self.bot
         if not bot or not bot.user:
             return None
+        def asset_url(asset) -> str:
+            return asset.replace(size=128, format="gif" if asset.is_animated() else "png").url
+
         if kind == "bot":
-            return bot.user.display_avatar.replace(size=128, format="png").url
+            return asset_url(bot.user.display_avatar)
         try:
             guild = bot.get_guild(int(ident))
         except ValueError:
             return None
-        return guild.icon.replace(size=128, format="png").url if guild and guild.icon else None
+        return asset_url(guild.icon) if guild and guild.icon else None
 
     def snapshot(self) -> dict:
         bot = self.bot

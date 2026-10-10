@@ -40,7 +40,7 @@ STRINGS = {
         "ban_line": "🔨 Ban",
         "strike_line": "⚖️ Detection {n} of {total}",
         "deleted_ban": "🗑️ Messages deleted by the ban (last {window})",
-        "dm_reason_title": "You were moderated on **{server}**.\n\n{reason}",
+        "dm_notify_title": "You were moderated on **{server}**.\n\n{reason}",
         "manual_ban_failed": "❌ Could not apply the action.",
     },
     "ru": {
@@ -84,7 +84,7 @@ STRINGS = {
         "ban_line": "🔨 Бан",
         "strike_line": "⚖️ Обнаружение {n} из {total}",
         "deleted_ban": "🗑️ Сообщения удалены баном (за последние {window})",
-        "dm_reason_title": "К вам применена модерация на сервере **{server}**.\n\n{reason}",
+        "dm_notify_title": "К вам применена модерация на сервере **{server}**.\n\n{reason}",
         "manual_ban_failed": "❌ Не удалось применить действие.",
     },
 }

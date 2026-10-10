@@ -243,13 +243,13 @@ const I18N = {
     "servers.all": "Servers",
     "servers.search_results": "Search results",
     "servers.nothing": "Nothing found",
-    "servers.dm_reason": "Also send the reason to the user in a direct message",
+    "servers.dm_notify": "Also send the reason to the user in a direct message",
     "servers.punish": "Punishment",
     "servers.punish_hint": "What the bot does after detecting a compromised account. Repeated detections of the same user on this server move through the steps below.",
     "servers.reset_days": "Reset detections after (days)",
     "servers.reset_days_hint": "The counter of a user is cleared after this many days without new detections (1–90). Nothing is kept longer than 90 days.",
-    "preset.default": "One action (as before)",
-    "preset.ladder": "Escalation: 4 detections, ends with a ban",
+    "preset.default": "One action",
+    "preset.ladder": "4 detections, then a ban",
     "preset.ladder_ban": "Ban at the first detection",
     "preset.custom": "Custom",
     "step.n": "Step {n}",
@@ -269,7 +269,7 @@ const I18N = {
     "err.steps_invalid": "Some step has invalid values.",
     "err.steps_empty": "Add at least one step for the custom preset.",
     "err.reset_days_range": "Days must be between 1 and 90.",
-    "err.dm_reason_invalid": "Invalid value.",
+    "err.dm_notify_invalid": "Invalid value.",
     "proxy.edit": "Edit",
     "proxy.form": "Add via form",
     "proxy.dialog_add": "New proxy",
@@ -360,16 +360,16 @@ const I18N = {
     "console.scope_all": "Everything stored",
     "console.scope_session": "Since the last bot start",
     "data.title": "Transfer settings",
-    "data.hint": "Saves server settings, punishment presets, reasons and detection counters to a file. User IDs in the counters are encrypted with the passphrase. Offenders and logs are not included. Anything older than 90 days is dropped on import.",
+    "data.hint": "Saves server settings, punishment presets, reasons and detection counters to a file. User IDs in the counters are encrypted with a password you set on export. Offenders and logs are not included. Anything older than 90 days is dropped on import.",
     "data.passphrase": "Passphrase",
     "data.export": "Export",
     "data.import": "Import",
     "data.file": "Export file",
     "data.imported": "Imported: {g} servers, {n} counters.",
     "data.choose": "Choose a file first.",
-    "err.passphrase_short": "The passphrase must be at least 6 characters.",
+    "err.passphrase_short": "The password must be at least 6 characters.",
     "err.import_invalid": "This file is not a valid export.",
-    "err.import_passphrase": "Wrong passphrase or damaged file.",
+    "err.import_passphrase": "Wrong password or damaged file.",
     "privacy.discord": "Log messages deleted in Discord: {n}.",
     "privacy.discord_skipped": "The bot is offline, so Discord log channels were not checked.",
     "privacy.discord_only": "No stored records, but the log channels in Discord will still be checked.",
@@ -379,7 +379,16 @@ const I18N = {
     "update.no_git": "The change list needs a git installation.",
     "log.ban": "Ban",
     "log.strike": "Detection {n} of {total}",
-    "log.deleted_ban": "Messages deleted by the ban (last {w})"
+    "log.deleted_ban": "Messages deleted by the ban (last {w})",
+    "nav.console": "Logs",
+    "proxy.flow_hint": "Can stay empty. Needed only if the server config has a flow (usually xtls-rprx-vision on TCP).",
+    "data.password": "Password",
+    "data.export_title": "Password for the file",
+    "data.export_text": "The password encrypts user IDs inside the file. You will need it to import the file.",
+    "data.import_title": "Import settings",
+    "data.import_text": "Enter the password of this file. Settings of the servers in the file will be replaced.",
+    "data.confirm": "Confirm",
+    "data.cancel": "Cancel"
   },
   ru: {
     "setup.title": "Настройка MrBeast GTFO",
@@ -623,13 +632,13 @@ const I18N = {
     "servers.all": "Серверы",
     "servers.search_results": "Результаты поиска",
     "servers.nothing": "Ничего не найдено",
-    "servers.dm_reason": "Также отправлять причину пользователю в личные сообщения",
+    "servers.dm_notify": "Также отправлять причину пользователю в личные сообщения",
     "servers.punish": "Наказание",
     "servers.punish_hint": "Что бот делает после обнаружения взломанного аккаунта. Повторные обнаружения того же пользователя на этом сервере проходят по шагам ниже.",
     "servers.reset_days": "Сбрасывать обнаружения через (дней)",
     "servers.reset_days_hint": "Счётчик пользователя очищается, если столько дней не было новых обнаружений (1–90). Дольше 90 дней ничего не хранится.",
-    "preset.default": "Одно действие (как раньше)",
-    "preset.ladder": "Нарастающее: 4 обнаружения, в конце бан",
+    "preset.default": "Одно действие",
+    "preset.ladder": "4 обнаружения с последующей блокировкой",
     "preset.ladder_ban": "Бан при первом обнаружении",
     "preset.custom": "Свой",
     "step.n": "Шаг {n}",
@@ -649,7 +658,7 @@ const I18N = {
     "err.steps_invalid": "В каком-то шаге неверные значения.",
     "err.steps_empty": "Добавьте хотя бы один шаг для своего пресета.",
     "err.reset_days_range": "Дней должно быть от 1 до 90.",
-    "err.dm_reason_invalid": "Неверное значение.",
+    "err.dm_notify_invalid": "Неверное значение.",
     "proxy.edit": "Изменить",
     "proxy.form": "Добавить через форму",
     "proxy.dialog_add": "Новый прокси",
@@ -740,16 +749,16 @@ const I18N = {
     "console.scope_all": "Всё сохранённое",
     "console.scope_session": "С последнего запуска бота",
     "data.title": "Перенос настроек",
-    "data.hint": "Сохраняет в файл настройки серверов, пресеты наказаний, причины и счётчики обнаружений. ID пользователей в счётчиках шифруются парольной фразой. Нарушители и логи не включаются. Всё старше 90 дней отбрасывается при импорте.",
+    "data.hint": "Сохраняет в файл настройки серверов, пресеты наказаний, причины и счётчики обнаружений. ID пользователей в счётчиках шифруются паролем, который вы задаёте при экспорте. Нарушители и логи не включаются. Всё старше 90 дней отбрасывается при импорте.",
     "data.passphrase": "Парольная фраза",
     "data.export": "Экспорт",
     "data.import": "Импорт",
     "data.file": "Файл экспорта",
     "data.imported": "Импортировано: серверов {g}, счётчиков {n}.",
     "data.choose": "Сначала выберите файл.",
-    "err.passphrase_short": "Парольная фраза должна быть не короче 6 символов.",
+    "err.passphrase_short": "Пароль должен быть не короче 6 символов.",
     "err.import_invalid": "Это не файл экспорта.",
-    "err.import_passphrase": "Неверная парольная фраза или повреждённый файл.",
+    "err.import_passphrase": "Неверный пароль или повреждённый файл.",
     "privacy.discord": "Удалено лог-сообщений в Discord: {n}.",
     "privacy.discord_skipped": "Бот не в сети, поэтому лог-каналы в Discord не проверялись.",
     "privacy.discord_only": "Сохранённых записей нет, но лог-каналы в Discord всё равно будут проверены.",
@@ -759,7 +768,16 @@ const I18N = {
     "update.no_git": "Для списка изменений нужна установка через git.",
     "log.ban": "Бан",
     "log.strike": "Обнаружение {n} из {total}",
-    "log.deleted_ban": "Сообщения удалены баном (за последние {w})"
+    "log.deleted_ban": "Сообщения удалены баном (за последние {w})",
+    "nav.console": "Логи",
+    "proxy.flow_hint": "Можно оставить пустым. Нужен, только если у сервера в конфиге указан flow (обычно xtls-rprx-vision на TCP).",
+    "data.password": "Пароль",
+    "data.export_title": "Пароль для файла",
+    "data.export_text": "Пароль шифрует ID пользователей внутри файла. Он понадобится при импорте.",
+    "data.import_title": "Импорт настроек",
+    "data.import_text": "Введите пароль этого файла. Настройки серверов из файла заменят текущие.",
+    "data.confirm": "Подтвердить",
+    "data.cancel": "Отмена"
   }
 };
 
@@ -815,7 +833,8 @@ const ICONS = {
   logout: "M10 5H5v14h5M15 8l4 4-4 4M9 12h10",
   search: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4",
   chevron: "M6 9l6 6 6-6",
-  edit: "M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"
+  edit: "M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4",
+  console: "M4 5h16v14H4zM7.5 9.5L10.5 12l-3 2.5M12.5 15h4"
 };
 
 function icon(name) {
@@ -1305,6 +1324,7 @@ const TABS = [
   ["status", "nav.status"],
   ["servers", "nav.servers"],
   ["proxy", "nav.proxy"],
+  ["console", "nav.console"],
   ["settings", "nav.settings"]
 ];
 
@@ -1363,10 +1383,12 @@ function renderDashboard() {
   paintPillFn = paintPill;
 
   async function paintTab() {
+    content.className = "content";
     if (ui.tab === "logs") renderLogsTab(content);
     else if (ui.tab === "status") { await refreshConsole(20); if (ui.tab === "status") renderStatusTab(content); }
     else if (ui.tab === "servers") renderServersTab(content);
     else if (ui.tab === "proxy") renderProxyTab(content);
+    else if (ui.tab === "console") renderConsoleTab(content);
     else renderSettingsTab(content);
   }
 
@@ -1400,6 +1422,7 @@ function renderDashboard() {
     if (ui.tab === "servers" && previousStatus !== null && previousStatus !== current && (previousStatus === "stopped" || current === "stopped")) renderServersTab(content);
     if (ui.tab === "settings") renderModerator();
     if (ui.tab === "proxy" && proxyRefresh) proxyRefresh();
+    if (ui.tab === "console" && consoleRefresh) consoleRefresh();
     if (ui.tab === "logs") repaintFeed();
     previousStatus = current;
   });
@@ -1550,7 +1573,7 @@ async function loadGuild(body, guildId) {
   const windowSeconds = h("input", { type: "number", min: "1", max: "3600", value: s.auto_window_seconds });
   const resetDays = h("input", { type: "number", min: "1", max: "90", value: s.warn_reset_days });
   const dm = h("input", { type: "checkbox" });
-  dm.checked = s.dm_reason;
+  dm.checked = s.dm_notify;
   const save = h("button", { class: "btn", type: "submit" }, tr("servers.save"));
 
   const preset = h("select", {}, ["default", "ladder", "ladder_ban", "custom"].map(id => h("option", { value: id }, tr("preset." + id))));
@@ -1625,7 +1648,7 @@ async function loadGuild(body, guildId) {
         timeout_reason: reason.value, timeout: timeout.value, delete_window: del.value,
         log_channel: channel.value, auto_min_images: images.value,
         auto_min_channels: channels.value, auto_window_seconds: windowSeconds.value,
-        punish_preset: preset.value, warn_reset_days: resetDays.value, dm_reason: dm.checked
+        punish_preset: preset.value, warn_reset_days: resetDays.value, dm_notify: dm.checked
       };
       if (preset.value === "custom") {
         const collected = collectSteps();
@@ -1655,7 +1678,7 @@ async function loadGuild(body, guildId) {
       defaultBox,
       stepsBox,
       h("div", { class: "row" }, field(tr("servers.reset_days"), resetDays, tr("servers.reset_days_hint"))),
-      h("label", { class: "check" }, dm, h("span", {}, tr("servers.dm_reason"))),
+      h("label", { class: "check" }, dm, h("span", {}, tr("servers.dm_notify"))),
       field(tr("servers.log_channel"), channel)
     ),
     h("div", { class: "section" },
@@ -1929,7 +1952,7 @@ function proxySection() {
   refresh();
 
   return h("div", { class: "section" },
-    h("p", { class: "meta" }, tr("proxy.hint", { max: 100 })),
+    h("p", { class: "meta" }, tr("proxy.hint", { max: 1000 })),
     h("div", { class: "proxy-meta" }, count, checked),
     note,
     subs,
@@ -2215,7 +2238,7 @@ function securitySection() {
     box.replaceChildren(
       h("h3", {}, tr("security.title")), h("p", { class: "meta" }, tr("security.lead")),
       has || model.questions.length ? null : h("div", { class: "msg info" }, tr("security.none")),
-      error, ...rows, add,
+      error, ...rows, add ? h("div", { class: "actions" }, add) : null,
       field(tr("security.hint"), hint, tr("security.hint_hint")),
       field(tr("settings.password"), password), save);
   }
@@ -2223,53 +2246,103 @@ function securitySection() {
   return box;
 }
 
-function consoleSection() {
-  const box = h("pre", { class: "console-box tall" }, "…");
+let consoleRefresh = null;
+
+function renderConsoleTab(content) {
+  content.className = "content console-mode";
+  const box = h("pre", { class: "console-box fill" }, "…");
   const scope = h("select", {}, h("option", { value: "all" }, tr("console.scope_all")), h("option", { value: "session" }, tr("console.scope_session")));
   const format = h("select", {}, ["txt", "json", "csv"].map(f => h("option", { value: f }, f.toUpperCase())));
+  let first = true;
   async function refresh() {
-    const res = await api("GET", "/api/console?limit=100");
-    box.textContent = res.ok && res.lines.length ? res.lines.map(consoleLine).join("\n") : tr("console.empty");
-    box.scrollTop = box.scrollHeight;
+    const res = await api("GET", "/api/console?limit=300");
+    if (!res.ok) return;
+    const atBottom = first || box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+    box.textContent = res.lines.length ? res.lines.map(consoleLine).join("\n") : tr("console.empty");
+    if (atBottom) box.scrollTop = box.scrollHeight;
+    first = false;
   }
+  consoleRefresh = refresh;
+  content.replaceChildren(h("div", { class: "console-page" },
+    h("div", { class: "console-bar" }, scope, format,
+      h("button", { class: "btn", type: "button", onclick: () => { window.location.href = "/api/console/export?format=" + format.value + "&scope=" + scope.value; } }, tr("console.export")),
+      h("button", { class: "btn secondary", type: "button", onclick: refresh }, tr("console.refresh"))),
+    h("p", { class: "meta" }, tr("console.hint", { n: 300 })),
+    box));
   refresh();
-  return h("div", { class: "section" }, h("h3", {}, tr("console.title")), h("p", { class: "meta" }, tr("console.hint", { n: 100 })), box,
-    h("div", { class: "row" }, field(tr("console.export"), scope), field(" ", format)),
-    h("div", { class: "actions" },
-      h("button", { class: "btn secondary", type: "button", onclick: refresh }, tr("console.refresh")),
-      h("button", { class: "btn", type: "button", onclick: () => { window.location.href = "/api/console/export?format=" + format.value + "&scope=" + scope.value; } }, tr("console.export"))));
+}
+
+function passwordDialog(options) {
+  const input = h("input", { type: "password", autocomplete: "off", spellcheck: "false" });
+  const error = formError();
+  const close = () => { back.remove(); document.removeEventListener("keydown", onKey); };
+  const onKey = (event) => { if (event.key === "Escape") close(); };
+  const confirm = h("button", { class: "btn" + (options.danger ? " danger" : ""), type: "button", onclick: async () => {
+    showError(error, "");
+    confirm.disabled = true;
+    const problem = await options.handler(input.value);
+    confirm.disabled = false;
+    if (problem) { showError(error, problem); input.select(); return; }
+    close();
+  } }, tr("data.confirm"));
+  input.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); confirm.click(); } });
+  const back = h("div", { class: "modal-back", onclick: (event) => { if (event.target === back) close(); } },
+    h("div", { class: "modal small", role: "dialog", "aria-modal": "true" },
+      h("h3", {}, options.title),
+      h("p", { class: "meta" }, options.text),
+      error, field(tr("data.password"), input),
+      h("div", { class: "modal-actions" }, h("button", { class: "btn secondary", type: "button", onclick: close }, tr("data.cancel")), confirm)));
+  document.addEventListener("keydown", onKey);
+  document.body.append(back);
+  input.focus();
 }
 
 function dataSection() {
   const out = h("div", {});
-  const passphrase = h("input", { type: "password", autocomplete: "off" });
-  const file = h("input", { type: "file", accept: "application/json,.json" });
+  const picker = h("input", { type: "file", accept: "application/json,.json", hidden: true });
 
-  async function doExport() {
-    const res = await api("POST", "/api/data/export", { passphrase: passphrase.value });
-    if (!res.ok) { out.replaceChildren(h("div", { class: "msg error" }, errorText(res))); return; }
-    const blob = new Blob([JSON.stringify(res.export, null, 1)], { type: "application/json" });
-    const link = h("a", { href: URL.createObjectURL(blob), download: "mrbeast-gtfo-export.json" });
-    document.body.append(link);
-    link.click();
-    link.remove();
+  function startExport() {
     out.replaceChildren();
+    passwordDialog({
+      title: tr("data.export_title"), text: tr("data.export_text"),
+      handler: async (password) => {
+        const res = await api("POST", "/api/data/export", { passphrase: password });
+        if (!res.ok) return errorText(res);
+        const blob = new Blob([JSON.stringify(res.export, null, 1)], { type: "application/json" });
+        const link = h("a", { href: URL.createObjectURL(blob), download: "mrbeast-gtfo-export.json" });
+        document.body.append(link);
+        link.click();
+        link.remove();
+        return null;
+      }
+    });
   }
 
-  async function doImport() {
-    if (!file.files.length) { out.replaceChildren(h("div", { class: "msg error" }, tr("data.choose"))); return; }
-    let parsed;
-    try { parsed = JSON.parse(await file.files[0].text()); } catch (e) { out.replaceChildren(h("div", { class: "msg error" }, tr("err.import_invalid"))); return; }
-    const res = await api("POST", "/api/data/import", { export: parsed, passphrase: passphrase.value });
-    if (!res.ok) { out.replaceChildren(h("div", { class: "msg error" }, errorText(res))); return; }
-    out.replaceChildren(h("div", { class: "msg ok" }, tr("data.imported", { g: res.guilds, n: res.strikes })));
-  }
+  picker.addEventListener("change", async () => {
+    out.replaceChildren();
+    const file = picker.files[0];
+    picker.value = "";
+    if (!file) return;
+    let parsed = null;
+    try { parsed = JSON.parse(await file.text()); } catch (e) { parsed = null; }
+    const valid = parsed && parsed.app === "mrbeast-gtfo" && parsed.format === 1 && parsed.settings && parsed.strikes;
+    if (!valid) { out.replaceChildren(h("div", { class: "msg error" }, tr("err.import_invalid"))); return; }
+    passwordDialog({
+      title: tr("data.import_title"), text: tr("data.import_text"), danger: true,
+      handler: async (password) => {
+        const res = await api("POST", "/api/data/import", { export: parsed, passphrase: password });
+        if (!res.ok) return errorText(res);
+        out.replaceChildren(h("div", { class: "msg ok" }, tr("data.imported", { g: res.guilds, n: res.strikes })));
+        return null;
+      }
+    });
+  });
 
   return h("div", { class: "section" }, h("h3", {}, tr("data.title")), h("p", { class: "meta" }, tr("data.hint")),
-    field(tr("data.passphrase"), passphrase),
-    h("div", { class: "actions" }, h("button", { class: "btn secondary", type: "button", onclick: doExport }, tr("data.export"))),
-    field(tr("data.file"), file),
-    h("div", { class: "actions" }, h("button", { class: "btn secondary", type: "button", onclick: doImport }, tr("data.import"))),
+    picker,
+    h("div", { class: "split-actions" },
+      h("button", { class: "btn secondary", type: "button", onclick: () => picker.click() }, tr("data.import")),
+      h("button", { class: "btn secondary", type: "button", onclick: startExport }, tr("data.export"))),
     out);
 }
 
@@ -2339,7 +2412,7 @@ async function openProxyDialog(entryId, done) {
       if (kind === "socks5" || kind === "http") nodes.push(h("h4", {}, tr("proxy.account")), bound("user", "text"), bound("password", "password"));
       if (kind === "shadowsocks") nodes.push(bound("method", "select", SS_METHODS), bound("password", "password"));
       if (kind === "trojan") nodes.push(bound("password", "password"), ...streamFields());
-      if (kind === "vless") nodes.push(bound("id", "text"), bound("flow", "select", ["", "xtls-rprx-vision"]), bound("encryption", "text"), ...streamFields());
+      if (kind === "vless") nodes.push(bound("id", "text"), ...(!data.network || data.network === "tcp" ? [bound("flow", "select", ["", "xtls-rprx-vision"]), h("p", { class: "meta hint-line" }, tr("proxy.flow_hint"))] : []), bound("encryption", "text"), ...streamFields());
       if (kind === "vmess") nodes.push(bound("id", "text"), bound("alter", "number"), bound("cipher", "select", ["auto", "aes-128-gcm", "chacha20-poly1305", "none", "zero"]), ...streamFields());
     }
     fieldsBox.replaceChildren(...nodes);
@@ -2427,7 +2500,6 @@ function renderSettingsTab(content) {
       securitySection(),
       moderatorSection(),
       h("div", { class: "section" }, h("h3", {}, tr("settings.token")), h("p", { class: "meta" }, tr("settings.token_hint")), tokenForm),
-      consoleSection(),
       dataSection(),
       privacySection()
     ),

@@ -408,7 +408,7 @@ def entry_from_fields(kind: str, fields: dict) -> dict:
     stream = build_stream(stream_query(fields), "none")
     if kind == "vless":
         user = {"id": user_id, "encryption": text_field(fields, "encryption") or "none"}
-        if text_field(fields, "flow"):
+        if text_field(fields, "flow") and (text_field(fields, "network") or "tcp") in ("tcp", "raw"):
             user["flow"] = text_field(fields, "flow")
     else:
         try:

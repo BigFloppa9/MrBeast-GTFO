@@ -116,11 +116,11 @@ def apply_patch(s: dict, patch: dict) -> list[str]:
         else:
             new["warn_reset_days"] = number
 
-    if "dm_reason" in patch:
-        if isinstance(patch["dm_reason"], bool):
-            new["dm_reason"] = patch["dm_reason"]
+    if "dm_notify" in patch:
+        if isinstance(patch["dm_notify"], bool):
+            new["dm_notify"] = patch["dm_notify"]
         else:
-            errors.append("dm_reason_invalid")
+            errors.append("dm_notify_invalid")
 
     if not errors:
         preset = new.get("punish_preset", s.get("punish_preset", "default"))
@@ -142,7 +142,7 @@ def sanitize_settings(raw) -> dict:
         patches.append({"timeout": fmt_duration(raw["timeout_duration"])})
     if isinstance(raw.get("delete_window"), int):
         patches.append({"delete_window": fmt_duration(raw["delete_window"])})
-    for key in ("timeout_reason", "auto_min_images", "auto_min_channels", "auto_window_seconds", "warn_reset_days", "dm_reason", "custom_steps"):
+    for key in ("timeout_reason", "auto_min_images", "auto_min_channels", "auto_window_seconds", "warn_reset_days", "dm_notify", "custom_steps"):
         if key in raw:
             patches.append({key: raw[key]})
     if "punish_preset" in raw:

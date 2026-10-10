@@ -306,7 +306,7 @@ def serialize_settings(guild: discord.Guild) -> dict:
         "punish_preset": s["punish_preset"],
         "custom_steps": s["custom_steps"],
         "warn_reset_days": s["warn_reset_days"],
-        "dm_reason": bool(s["dm_reason"]),
+        "dm_notify": bool(s["dm_notify"]),
         "preview": preview_steps(s),
         "max_steps": MAX_STEPS,
     }

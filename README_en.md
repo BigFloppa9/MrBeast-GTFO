@@ -145,7 +145,8 @@ For the bot to grant itself access to the log channel, additionally give it **Ma
 | **Offenders** | Latest records as Discord-style messages: offender display name, username and ID, trigger text, channel link, images (identical ones stored once), action. Updates automatically |
 | **Status** | Bot state, ping, uptime, control buttons, panel addresses on the network |
 | **Servers** | The server list and per server (Telegram-style picker with smart search): punishment preset, steps, reasons, detection reset period, log channel, auto-detection thresholds |
-| **Proxy** | Proxy and subscription list, state of each entry, time of the last check |
+| **Proxy** | Proxy and subscription list, state of each entry, time of the last check, entry editor |
+| **Logs** | Console log across the whole page with export |
 | **Settings** | Languages, administrator account link, token replacement, updates, removal of a user's data |
 
 In the panel logs, offender fields, trigger text and channel names are cut to 69 characters so spam can't bloat the history. Videos are not saved. Records are kept for at most 30 days (and at most 300 records).
@@ -219,17 +220,17 @@ In the **Servers** tab each server gets a preset:
 
 | Preset | What it does |
 |---|---|
-| One action (as before) | timeout and message deletion with the configured values on every detection |
-| Escalation | 1st detection: 5 min timeout and deletion for 1 h; 2nd: 1 day and 1 day; 3rd: 1 week and 1 day; 4th and later: ban and deletion for 1 day. The reason gets the detection number and a request to contact a moderator if it was a mistake |
+| One action | timeout and message deletion with the configured values on every detection |
+| 4 detections, then a ban | 1st detection: 5 min timeout and deletion for 1 h; 2nd: 1 day and 1 day; 3rd: 1 week and 1 day; 4th and later: ban and deletion for 1 day. The reason gets the detection number and a request to contact a moderator if it was a mistake |
 | Ban at the first detection | ban and deletion of messages for 1 day |
 | Custom | up to 8 steps: action (timeout or ban), length, deletion period and reason for each |
 
-The detection counter is kept per user per server and resets after the configured number of days without violations (30 by default, 90 at most). Nothing is stored longer than 90 days. The reason is sent to the offender in a direct message (can be turned off) and written to the audit log. On a ban Discord deletes messages for the chosen period (7 days at most).
+The detection counter is kept per user per server and resets after the configured number of days without violations (30 by default, 90 at most). Nothing is stored longer than 90 days. The reason is written to the audit log; sending it to the offender in a direct message is off by default and is enabled with a checkbox in the server settings. On a ban Discord deletes messages for the chosen period (7 days at most).
 
 <h3 align="center">Settings transfer, console log, updates</h3>
 
-- **Settings → Transfer settings** saves server settings, presets, reasons and counters to a file. User IDs in the counters are encrypted with a passphrase, offenders and logs are not included, and records older than 90 days are dropped on import.
-- **Settings → Console log** shows the last 100 lines; export as txt, json or csv, for everything stored or since the last bot start. The file `data/console.log` keeps up to 2000 lines for 30 days.
+- **Settings → Transfer settings**: "Import" on the left, "Export" on the right. Export asks for a password and saves a file with server settings, presets, reasons and counters; user IDs in the counters are encrypted with that password, offenders and logs are not included. Import opens a file picker, checks the file and asks for the password; records older than 90 days are dropped.
+- The **Logs** tab (between "Proxy" and "Settings") shows the console log across the whole page, the last 300 lines with auto-refresh; export as txt, json or csv, for everything stored or since the last bot start. The file `data/console.log` keeps up to 2000 lines for 30 days.
 - The version block at the top right of **Settings**: "Show changes" expands the latest commits (needs a git installation), "Check for update" runs the usual check.
 
 ---

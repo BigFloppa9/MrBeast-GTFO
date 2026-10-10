@@ -194,10 +194,10 @@ async def apply_step(guild: discord.Guild, target: discord.Member, step: dict, r
 
 
 async def send_reason(guild: discord.Guild, target: discord.Member, reason: str):
-    if not state.settings.get(guild.id).get("dm_reason", True):
+    if not state.settings.get(guild.id).get("dm_notify", False):
         return
     try:
-        await target.send(t(lang(), "dm_reason_title", server=guild.name, reason=reason)[:2000])
+        await target.send(t(lang(), "dm_notify_title", server=guild.name, reason=reason)[:2000])
     except (discord.Forbidden, discord.HTTPException):
         pass
 
