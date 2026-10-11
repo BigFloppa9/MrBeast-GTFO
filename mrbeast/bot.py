@@ -10,6 +10,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from .consolelog import console
 from .config import MAX_BAN_DELETE_MINUTES, effective_reason, step_reason, steps_for
 from .i18n import t
 from .logstore import MAX_IMAGE_BYTES, MAX_IMAGES_PER_LOG, cut, save_image_async
@@ -23,6 +24,8 @@ MEDIA_DOMAINS = ("discordapp.com", "discordapp.net")
 MAX_DOWNLOADS = 12
 RETENTION_SCAN_DAYS = 90
 SCAN_LIMIT = 3000
+TRACK_QUIET = 10
+TRACK_MAX = 30
 BULK_DELETE_AGE = timedelta(days=13)
 
 
@@ -350,6 +353,26 @@ class Guard(commands.Cog):
         self.busy: set[tuple[int, int]] = set()
         self.cooldown: dict[tuple[int, int], float] = {}
         self.hinted: dict[int, float] = {}
+        self.track_pending: dict[tuple[int, int], dict] = {}
+
+    def flush_tracker(self, key: tuple[int, int]):
+        item = self.track_pending.pop(key, None)
+        if item is None:
+            return
+        item["handle"].cancel()
+        images, channels = item["images"], len(item["channels"])
+        logger.info(f"[Tracker] {item['author']}: {images} image{'s' if images != 1 else ''} in {channels} channel{'s' if channels != 1 else ''}")
+
+    def track(self, key: tuple[int, int], author, images: int, channels: set):
+        now = time.monotonic()
+        item = self.track_pending.get(key)
+        if item is None:
+            item = self.track_pending[key] = {"since": now, "handle": None}
+        else:
+            item["handle"].cancel()
+        item["author"], item["images"], item["channels"] = str(author), images, set(channels)
+        delay = max(0.0, min(TRACK_QUIET, TRACK_MAX - (now - item["since"])))
+        item["handle"] = asyncio.get_running_loop().call_later(delay, self.flush_tracker, key)
 
     async def run_auto(self, guild: discord.Guild, target: discord.Member, trigger_msg: discord.Message, evidence: list):
         s = state.settings.get(guild.id)
@@ -431,9 +454,10 @@ class Guard(commands.Cog):
         tracker = self.image_tracker[gid][uid]
 
         unique_chs = {e["ch"] for e in tracker}
-        logger.info(f"[Tracker] {message.author}: {len(tracker)} images in {len(unique_chs)} channels")
+        self.track((gid, uid), message.author, len(tracker), unique_chs)
 
         if len(tracker) >= s["auto_min_images"] and len(unique_chs) >= s["auto_min_channels"]:
+            self.flush_tracker((gid, uid))
             self.busy.add((gid, uid))
             evidence = [e["msg"] for e in tracker]
             self.image_tracker[gid][uid] = []
@@ -598,6 +622,7 @@ class GuardBot(commands.Bot):
 
     async def on_ready(self):
         self.ready_at = time.time()
+        console.fold_end()
         logger.info(f"Logged in as {self.user}")
 
     async def on_command_error(self, ctx, error):

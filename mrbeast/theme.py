@@ -5,6 +5,8 @@ import aiohttp
 
 from .config import DATA_DIR, write_bytes_atomic
 from .logstore import MAX_IMAGE_BYTES, detect_extension
+from .state import state
+from .utils import read_capped
 
 KOS_URL = (
     "https://sun1-13.userapi.com/s/v1/ig2/6ik4I-I0a9zOuDvPmcE45LYfduxHpbV2E2WexX5hHhrxVSPn-iaon8XhyfC0LDViMa0lCd_KDBoi2zKITAiR_RfY.jpg"
@@ -34,11 +36,16 @@ async def ensure_background():
         path = cached()
         if path:
             return path
+        async def fetch(route):
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20, connect=8)) as session:
+                async with session.get(KOS_URL, proxy=route) as resp:
+                    if resp.status != 200:
+                        raise aiohttp.ClientError(f"HTTP {resp.status}")
+                    return await read_capped(resp, MAX_IMAGE_BYTES)
+
         try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as session:
-                async with session.get(KOS_URL) as resp:
-                    data = await resp.content.read(MAX_IMAGE_BYTES + 1) if resp.status == 200 else b""
-        except (aiohttp.ClientError, asyncio.TimeoutError):
+            data = await state.proxies.with_routes(fetch)
+        except Exception:
             data = b""
         ext = detect_extension(data) if 0 < len(data) <= MAX_IMAGE_BYTES else None
         if not ext:

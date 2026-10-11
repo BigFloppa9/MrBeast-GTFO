@@ -154,3 +154,12 @@ def sanitize_settings(raw) -> dict:
     if isinstance(raw.get("log_channel"), int) and raw["log_channel"] >= 0:
         trial["log_channel"] = raw["log_channel"]
     return trial
+
+
+async def read_capped(resp, limit: int) -> bytes:
+    buf = bytearray()
+    async for chunk in resp.content.iter_chunked(65536):
+        buf.extend(chunk)
+        if len(buf) > limit:
+            break
+    return bytes(buf)

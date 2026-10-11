@@ -10,6 +10,13 @@ MAX_LINES = 2000
 MAX_AGE = 30 * 86400
 COMPACT_EVERY = 500
 LEVELS = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40, "CRITICAL": 50}
+FOLD_TEXT = {
+    "switch": (None, "proxy switched"),
+    "restart": ("restarting", "restarted"),
+    "lost": ("reconnecting", "reconnected"),
+    "network": ("network reconnect, restarting", "restarted"),
+}
+FOLD_ORDER = ("switch", "restart", "lost", "network")
 
 
 class ConsoleLog(logging.Handler):
@@ -20,6 +27,7 @@ class ConsoleLog(logging.Handler):
         self.session = time.time()
         self.activation = time.time()
         self.written = 0
+        self.folding = None
         self.load()
 
     def load(self):
@@ -43,7 +51,46 @@ class ConsoleLog(logging.Handler):
                 message += " | " + logging.Formatter().formatException(record.exc_info).splitlines()[-1]
         except Exception:
             return
-        item = {"ts": round(record.created, 3), "level": record.levelname, "name": record.name, "msg": message[:1500]}
+        if self.folded(record.name, message):
+            return
+        self.store({"ts": round(record.created, 3), "level": record.levelname, "name": record.name, "msg": message[:1500]})
+
+    def folded(self, name: str, message: str) -> bool:
+        if name == "discord.gateway" and "successfully RESUMED session" in message:
+            if not self.folding:
+                self.note("reconnected (session resumed)")
+            return True
+        if self.folding and (
+            (name == "discord.client" and message.startswith("logging in using"))
+            or (name == "mrbeast.proxy" and message.startswith("Using proxy"))
+        ):
+            return True
+        return False
+
+    def note(self, message: str):
+        self.store({"ts": round(time.time(), 3), "level": "INFO", "name": "mrbeast.network", "msg": message})
+
+    def fold_begin(self, kind: str = "network"):
+        with self.lock2:
+            current = self.folding
+            if current and FOLD_ORDER.index(kind) <= FOLD_ORDER.index(current):
+                return
+            self.folding = kind
+        text = FOLD_TEXT[kind][0]
+        if text and not (current and FOLD_TEXT[current][0] == text):
+            self.note(text)
+
+    def fold_end(self):
+        with self.lock2:
+            kind, self.folding = self.folding, None
+        if kind:
+            self.note(FOLD_TEXT[kind][1])
+
+    def fold_cancel(self):
+        with self.lock2:
+            self.folding = None
+
+    def store(self, item: dict):
         with self.lock2:
             self.items.append(item)
             try:

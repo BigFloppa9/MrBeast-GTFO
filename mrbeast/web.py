@@ -21,6 +21,7 @@ from .runner import clean_token, runner, validate_token
 from .security import CODE_TTL, MAX_HINT, MIN_PASSWORD_LENGTH, QUESTION_IDS
 from .images import cached_image
 from .network import lan_addresses
+from .transfer import seal, unseal
 from .proxy import FORM_KINDS, ParseError, SubError, entry_fields, entry_from_fields, load_subscription, parse_input, resolve_url
 from .state import state
 from .theme import CONTENT_TYPES as BG_TYPES, ensure_background
@@ -507,11 +508,14 @@ async def api_data_export(request: web.Request):
     state.strikes.expire({str(gid): s["warn_reset_days"] for gid, s in state.settings.data.items()})
     block = await asyncio.to_thread(state.strikes.export_block, passphrase)
     settings = {str(gid): s for gid, s in state.settings.data.items()}
-    return ok(export={
+    export = {
         "app": "mrbeast-gtfo", "format": 1, "version": __version__, "exported": int(time.time()),
         "config": {"bot_lang": state.config.bot_lang, "panel_lang": state.config.panel_lang},
         "settings": settings, "strikes": block,
-    })
+    }
+    if state.proxies.entries or state.proxies.subs:
+        export["proxies"] = await asyncio.to_thread(seal, state.proxies.export_data(), passphrase)
+    return ok(export=export)
 
 
 async def api_data_import(request: web.Request):
@@ -537,7 +541,16 @@ async def api_data_import(request: web.Request):
     state.settings.save()
     cfg = export.get("config") if isinstance(export.get("config"), dict) else {}
     state.config.set_languages(bot_lang=cfg.get("bot_lang"), panel_lang=cfg.get("panel_lang"))
-    return ok(guilds=len(cleaned), strikes=merged)
+    proxies = 0
+    if isinstance(export.get("proxies"), dict):
+        try:
+            payload = await asyncio.to_thread(unseal, export["proxies"], passphrase)
+        except ValueError as e:
+            return fail(str(e))
+        proxies = state.proxies.import_data(payload)
+        if proxies:
+            await restart_bot()
+    return ok(guilds=len(cleaned), strikes=merged, proxies=proxies)
 
 
 async def api_update_status(request: web.Request):
@@ -589,7 +602,7 @@ async def read_subscription(url: str):
     if not url.lower().startswith(("http://", "https://")) or len(url) > 2000:
         return None, fail("sub_invalid")
     try:
-        return await load_subscription(url, state.proxy_url, state.config.hwid), None
+        return await load_subscription(url, state.proxies, state.config.hwid), None
     except SubError as e:
         return None, fail(e.code, detail=e.detail)
 
@@ -601,9 +614,9 @@ async def api_sub_add(request: web.Request):
         return error
     entries, skipped = parsed
     known = next((x for x in state.proxies.subs if x["url"] == url), None)
-    state.proxies.set_subscription(url, entries, known["id"] if known else None)
+    _, added = state.proxies.merge_subscription(url, entries, known["id"] if known else None)
     await restart_bot()
-    return ok(skipped=skipped, **state.proxies.view())
+    return ok(skipped=skipped, added=added, **state.proxies.view())
 
 
 async def api_sub_update(request: web.Request):
@@ -614,9 +627,10 @@ async def api_sub_update(request: web.Request):
     if error:
         return error
     entries, skipped = parsed
-    state.proxies.set_subscription(sub["url"], entries, sub["id"])
-    await restart_bot()
-    return ok(skipped=skipped, **state.proxies.view())
+    _, added = state.proxies.merge_subscription(sub["url"], entries, sub["id"])
+    if added:
+        await restart_bot()
+    return ok(skipped=skipped, added=added, **state.proxies.view())
 
 
 async def api_sub_delete(request: web.Request):
@@ -635,22 +649,43 @@ async def api_proxy_add(request: web.Request):
     entries, errors, subs = parse_input(str(data.get("text") or ""))
     added = state.proxies.add(entries) if entries else 0
     full = bool(entries) and not added
+    loaded_subs = 0
     for n, url in subs:
         try:
-            url = await resolve_url(url, state.proxy_url)
-            loaded, _ = await load_subscription(url, state.proxy_url, state.config.hwid)
+            url = await resolve_url(url, state.proxies)
+            loaded, _ = await load_subscription(url, state.proxies, state.config.hwid)
         except SubError as e:
             errors.append({"code": e.code, "n": n, "detail": e.detail})
             continue
         known = next((x for x in state.proxies.subs if x["url"] == url), None)
-        sub = state.proxies.set_subscription(url, loaded, known["id"] if known else None)
-        added += sub.get("count", 0)
-        if len(loaded) > sub.get("count", 0):
-            errors.append({"code": "sub_truncated", "n": n, "detail": str(len(loaded) - sub.get("count", 0))})
-    if not added:
+        _, fresh = state.proxies.merge_subscription(url, loaded, known["id"] if known else None)
+        loaded_subs += 1
+        added += fresh
+        if len(state.proxies.entries) >= state.proxies.max_entries() and fresh < len(loaded):
+            errors.append({"code": "sub_truncated", "n": n, "detail": str(len(loaded) - fresh)})
+    if not added and not loaded_subs:
         return fail("proxy_limit" if full else "proxy_invalid", errors=errors)
-    await restart_bot()
+    if added:
+        await restart_bot()
     return ok(added=added, errors=errors, **state.proxies.view())
+
+
+async def api_proxy_ping(request: web.Request):
+    pid = request.match_info["pid"]
+    if not any(e["id"] == pid for e in state.proxies.entries):
+        return fail("proxy_missing", 404)
+    await state.proxies.probe_all(ids={pid})
+    return ok(**state.proxies.view())
+
+
+async def api_sub_ping(request: web.Request):
+    sid = request.match_info["sid"]
+    ids = {e["id"] for e in state.proxies.entries if e.get("sub") == sid}
+    if not any(x["id"] == sid for x in state.proxies.subs):
+        return fail("proxy_missing", 404)
+    if ids:
+        await state.proxies.probe_all(ids=ids)
+    return ok(**state.proxies.view())
 
 
 async def api_proxy_form_add(request: web.Request):
@@ -692,7 +727,7 @@ async def api_proxy_delete(request: web.Request):
 
 
 def create_app() -> web.Application:
-    app = web.Application(middlewares=[guard], client_max_size=1024 * 1024)
+    app = web.Application(middlewares=[guard], client_max_size=8 * 1024 * 1024)
     app.router.add_get("/", index)
     app.router.add_get("/static/{name}", static_file)
     app.router.add_get("/api/state", api_state)
@@ -726,6 +761,8 @@ def create_app() -> web.Application:
     app.router.add_post("/api/bot/{action}", api_bot)
     app.router.add_post("/api/proxy/sub", api_sub_add)
     app.router.add_post("/api/proxy/sub/{sid}/update", api_sub_update)
+    app.router.add_post("/api/proxy/sub/{sid}/ping", api_sub_ping)
+    app.router.add_post("/api/proxy/{pid}/ping", api_proxy_ping)
     app.router.add_delete("/api/proxy/sub/{sid}", api_sub_delete)
     app.router.add_get("/api/proxy", api_proxy_get)
     app.router.add_post("/api/proxy", api_proxy_add)

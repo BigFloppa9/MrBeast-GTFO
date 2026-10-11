@@ -11,10 +11,12 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 
 from .config import CACHE_DIR, read_json, write_json
+from .utils import read_capped
 
 logger = logging.getLogger("mrbeast.happ")
 
 KEYS_URL = "https://raw.githubusercontent.com/cylaro/happ-decrypt/29c299d03db63a9f0a510a48166f784b0fcb4b2a/public/data/crypt5-keys.json"
+KEYS_LATEST_URL = "https://raw.githubusercontent.com/cylaro/happ-decrypt/main/public/data/crypt5-keys.json"
 KEYS_SOURCE = "github.com/cylaro/happ-decrypt"
 KEYS_FILE = CACHE_DIR / "happ-crypt5-keys.json"
 MAX_KEYS_BYTES = 400_000
@@ -135,20 +137,20 @@ def valid_table(data) -> bool:
     )
 
 
-async def keytable(via: str | None = None) -> dict:
-    async with keys_lock:
-        data = read_json(KEYS_FILE, None)
-        if valid_table(data):
-            return data
-        try:
-            timeout = aiohttp.ClientTimeout(total=25)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(KEYS_URL, proxy=via) as resp:
-                    if resp.status != 200:
-                        raise CryptError("crypt_keys_unavailable")
-                    raw = await resp.content.read(MAX_KEYS_BYTES + 1)
-        except (aiohttp.ClientError, asyncio.TimeoutError, OSError):
-            raise CryptError("crypt_keys_unavailable")
+async def run_routed(pool, action):
+    if pool is None:
+        return await action(None)
+    return await pool.with_routes(action)
+
+
+async def download_table(url: str, pool) -> dict:
+    async def fetch(route):
+        timeout = aiohttp.ClientTimeout(total=25, connect=10)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(url, proxy=route) as resp:
+                if resp.status != 200:
+                    raise CryptError("crypt_keys_unavailable")
+                raw = await read_capped(resp, MAX_KEYS_BYTES)
         if len(raw) > MAX_KEYS_BYTES:
             raise CryptError("crypt_keys_unavailable")
         try:
@@ -157,20 +159,44 @@ async def keytable(via: str | None = None) -> dict:
             raise CryptError("crypt_keys_unavailable")
         if not valid_table(data):
             raise CryptError("crypt_keys_unavailable")
+        return data
+
+    try:
+        return await run_routed(pool, fetch)
+    except CryptError:
+        raise
+    except Exception:
+        raise CryptError("crypt_keys_unavailable")
+
+
+async def keytable(pool=None, refresh: bool = False) -> dict:
+    async with keys_lock:
+        if not refresh:
+            data = read_json(KEYS_FILE, None)
+            if valid_table(data):
+                return data
+        try:
+            data = await download_table(KEYS_LATEST_URL if refresh else KEYS_URL, pool)
+        except CryptError:
+            if not refresh:
+                raise
+            data = await download_table(KEYS_URL, pool)
         write_json(KEYS_FILE, data)
+        key_cache.clear()
         return data
 
 
-async def resolve(link: str, via: str | None = None) -> str:
+async def resolve(link: str, pool=None) -> str:
     payload = link.split("/", 3)[3] if link.count("/") >= 3 else ""
-    table = await keytable(via)
+    table = await keytable(pool)
     try:
         url = await asyncio.to_thread(decrypt_crypt5, payload, table)
     except CryptError as e:
-        if e.code == "crypt_unknown_key" and KEYS_FILE.exists():
-            KEYS_FILE.unlink(missing_ok=True)
-            table = await keytable(via)
-            url = await asyncio.to_thread(decrypt_crypt5, payload, table)
+        if e.code in ("crypt_unknown_key", "crypt_failed"):
+            fresh = await keytable(pool, refresh=True)
+            if fresh == table:
+                raise
+            url = await asyncio.to_thread(decrypt_crypt5, payload, fresh)
         else:
             raise
     if not url.lower().startswith(("http://", "https://")):

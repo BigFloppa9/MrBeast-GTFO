@@ -111,7 +111,16 @@ const I18N = {
     "net.other": "other",
     "proxy.sub_update": "Update",
     "proxy.sub_count": "{n} servers",
-    "proxy.sub_updated": "Subscription updated: {n} servers.",
+    "proxy.sub_updated": "Subscription updated: {n} new, {total} servers in total.",
+    "proxy.nothing_new": "Nothing new: everything is already in the list.",
+    "proxy.ping": "Check ping",
+    "proxy.ping_sub": "Check ping of all servers",
+    "proxy.pinged": "Check finished.",
+    "proxy.timer_tip": "Time left until this proxy is removed automatically if it does not come back online.",
+    "proxy.show": "Show servers",
+    "proxy.hide": "Hide servers",
+    "proxy.secret": "Hover (or tap) to reveal the link",
+    "proxy.empty_sub": "No servers from this subscription.",
     "proxy.hint": "Needed if Discord is blocked by your provider. Paste proxy links (socks5, http, vless, vmess, trojan, ss), a JSON config or a subscription link (https://…), one per line. Up to {max} entries.",
     "proxy.placeholder": "socks5://127.0.0.1:2080\nvless://uuid@host:443?type=tcp&security=reality&…\nhttps://example.com/sub/…\n{ JSON config }",
     "proxy.add": "Add",
@@ -360,12 +369,12 @@ const I18N = {
     "console.scope_all": "Everything stored",
     "console.scope_session": "Since the last bot start",
     "data.title": "Transfer settings",
-    "data.hint": "Saves server settings, punishment presets, reasons and detection counters to a file. User IDs in the counters are encrypted with a password you set on export. Offenders and logs are not included. Anything older than 90 days is dropped on import.",
+    "data.hint": "Saves server settings, punishment presets, reasons, detection counters and proxies to a file. User IDs and proxy data are encrypted with a password you set on export. Offenders and logs are not included. Anything older than 90 days is dropped on import.",
     "data.passphrase": "Passphrase",
     "data.export": "Export",
     "data.import": "Import",
     "data.file": "Export file",
-    "data.imported": "Imported: {g} servers, {n} counters.",
+    "data.imported": "Imported: {g} servers, {n} counters, {p} proxies.",
     "data.choose": "Choose a file first.",
     "err.passphrase_short": "The password must be at least 6 characters.",
     "err.import_invalid": "This file is not a valid export.",
@@ -500,7 +509,16 @@ const I18N = {
     "net.other": "другое",
     "proxy.sub_update": "Обновить",
     "proxy.sub_count": "Серверов: {n}",
-    "proxy.sub_updated": "Подписка обновлена: серверов {n}.",
+    "proxy.sub_updated": "Подписка обновлена: новых {n}, всего серверов {total}.",
+    "proxy.nothing_new": "Ничего нового: всё уже есть в списке.",
+    "proxy.ping": "Проверить пинг",
+    "proxy.ping_sub": "Проверить пинг всех серверов",
+    "proxy.pinged": "Проверка завершена.",
+    "proxy.timer_tip": "Время до автоматического удаления этого прокси, если он не выйдет в сеть.",
+    "proxy.show": "Показать серверы",
+    "proxy.hide": "Скрыть серверы",
+    "proxy.secret": "Наведите курсор (или коснитесь), чтобы увидеть ссылку",
+    "proxy.empty_sub": "Серверов этой подписки нет.",
     "proxy.hint": "Нужно, если Discord заблокирован у провайдера. Вставьте ссылки на прокси (socks5, http, vless, vmess, trojan, ss), JSON-конфиг или ссылку на подписку (https://…), по одной в строке. До {max} записей.",
     "proxy.placeholder": "socks5://127.0.0.1:2080\nvless://uuid@host:443?type=tcp&security=reality&…\nhttps://example.com/sub/…\n{ JSON-конфиг }",
     "proxy.add": "Добавить",
@@ -749,12 +767,12 @@ const I18N = {
     "console.scope_all": "Всё сохранённое",
     "console.scope_session": "С последнего запуска бота",
     "data.title": "Перенос настроек",
-    "data.hint": "Сохраняет в файл настройки серверов, пресеты наказаний, причины и счётчики обнаружений. ID пользователей в счётчиках шифруются паролем, который вы задаёте при экспорте. Нарушители и логи не включаются. Всё старше 90 дней отбрасывается при импорте.",
+    "data.hint": "Сохраняет в файл настройки серверов, пресеты наказаний, причины, счётчики обнаружений и прокси. ID пользователей и данные прокси шифруются паролем, который вы задаёте при экспорте. Нарушители и логи не включаются. Всё старше 90 дней отбрасывается при импорте.",
     "data.passphrase": "Парольная фраза",
     "data.export": "Экспорт",
     "data.import": "Импорт",
     "data.file": "Файл экспорта",
-    "data.imported": "Импортировано: серверов {g}, счётчиков {n}.",
+    "data.imported": "Импортировано: серверов {g}, счётчиков {n}, прокси {p}.",
     "data.choose": "Сначала выберите файл.",
     "err.passphrase_short": "Пароль должен быть не короче 6 символов.",
     "err.import_invalid": "Это не файл экспорта.",
@@ -833,6 +851,7 @@ const ICONS = {
   logout: "M10 5H5v14h5M15 8l4 4-4 4M9 12h10",
   search: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4",
   chevron: "M6 9l6 6 6-6",
+  speed: "M3.5 16a8.5 8.5 0 1 1 17 0M12 16l4.2-5.2M12 16h.01",
   edit: "M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4",
   console: "M4 5h16v14H4zM7.5 9.5L10.5 12l-3 2.5M12.5 15h4"
 };
@@ -1339,11 +1358,10 @@ async function enterDashboard() {
   renderDashboard();
 }
 
-function stateDotClass(status) {
-  if (status === "online") return "dot online";
-  if (status === "error") return "dot error";
-  if (status === "starting" || status === "reconnecting" || status === "paused") return "dot wait";
-  return "dot";
+function capsuleClass(status) {
+  if (status === "online") return "capsule green";
+  if (status === "starting" || status === "reconnecting") return "capsule orange";
+  return "capsule red";
 }
 
 function renderDashboard() {
@@ -1352,11 +1370,12 @@ function renderDashboard() {
   lastLogId = 0;
   const content = h("div", { class: "content", id: "content" });
   const banner = h("div", { class: "msg error banner", hidden: true, role: "alert" });
-  const title = h("div", {});
-  const pill = h("div", { class: "pill top", id: "pill" });
+  const capsule = h("div", { class: "capsule", id: "capsule" });
   const nav = h("div", { class: "nav" });
   const brandName = h("span", { id: "brand-name" }, "MrBeast GTFO");
-  const brand = h("div", { class: "brand" }, h("div", { class: "avatar fallback", id: "brand-avatar" }, "M"), brandName);
+  const brand = h("div", { class: "brand-box" },
+    h("div", { class: "brand" }, h("div", { class: "avatar fallback", id: "brand-avatar" }, "M"), brandName),
+    capsule);
 
   function paintNav() {
     nav.replaceChildren(...TABS.map(([id, label]) => h("button", {
@@ -1364,13 +1383,12 @@ function renderDashboard() {
       type: "button",
       onclick: () => { ui.tab = id; paintNav(); paintTab(); }
     }, icon(id), h("span", {}, tr(label)))));
-    title.textContent = tr(TABS.find(t => t[0] === ui.tab)[1]);
   }
 
   function paintPill() {
     const status = statusData && statusData.ok ? statusData.bot.status : "stopped";
-    pill.replaceChildren(h("span", { class: stateDotClass(status) }), h("span", { class: "label" }, tr("state." + status)));
-    if (status === "paused") pill.firstChild.className = "dot wait";
+    capsule.className = capsuleClass(status);
+    capsule.textContent = tr("state." + status);
     const problem = statusData && statusData.ok ? statusData.bot.error : "";
     banner.textContent = problem ? tr("status.err." + problem) : "";
     banner.hidden = !problem;
@@ -1397,14 +1415,11 @@ function renderDashboard() {
     onclick: async () => { await api("POST", "/api/logout", {}); me.authed = false; stopTimers(); renderLogin(); }
   }, icon("logout"), h("span", { class: "label" }, tr("nav.logout")));
 
+  const byline = h("a", { class: "byline", href: "https://github.com/BigFloppa9", target: "_blank", rel: "noopener noreferrer" }, "By BigFloppa9");
+
   mount(h("div", { class: "shell" },
-    h("aside", { class: "side" }, brand, nav, h("div", { class: "side-foot" }, langInline(), logout)),
-    h("section", { class: "main" },
-      h("header", { class: "topbar" }, h("div", { class: "top-left" }, title, pill),
-        h("a", { class: "byline", href: "https://github.com/BigFloppa9", target: "_blank", rel: "noopener noreferrer" }, "By BigFloppa9")),
-      banner,
-      content
-    )
+    h("aside", { class: "side" }, brand, nav, h("div", { class: "side-foot" }, h("div", { class: "foot-row" }, langInline(), byline), logout)),
+    h("section", { class: "main" }, banner, content)
   ));
 
   paintNav();
@@ -1418,7 +1433,7 @@ function renderDashboard() {
     statusData = res;
     paintPill();
     const current = res.bot.status;
-    if (ui.tab === "status") { await refreshConsole(20); renderStatusTab(content); }
+    if (ui.tab === "status") { await refreshConsole(20); updateStatusTab(content); }
     if (ui.tab === "servers" && previousStatus !== null && previousStatus !== current && (previousStatus === "stopped" || current === "stopped")) renderServersTab(content);
     if (ui.tab === "settings") renderModerator();
     if (ui.tab === "proxy" && proxyRefresh) proxyRefresh();
@@ -1490,6 +1505,38 @@ async function botAction(action, content) {
   renderStatusTab(content);
 }
 
+let statusRefs = null;
+
+function statusSignature() {
+  const net = statusData.network;
+  return JSON.stringify([statusData.bot.error, statusData.token_ready, statusData.bot_state, net ? net.addresses.map(a => a.ip + a.kind) : null, LANG]);
+}
+
+function consoleText() {
+  return consoleCache.length ? consoleCache.slice(-20).map(consoleLine).join("\n") : tr("status.console_empty");
+}
+
+function paintConsoleBox(box) {
+  const value = consoleText();
+  if (box.dataset.text !== value) {
+    box.textContent = value;
+    box.dataset.text = value;
+  }
+}
+
+function updateStatusTab(content) {
+  const refs = statusRefs;
+  if (!statusData || !statusData.ok || !refs || !refs.box.isConnected || refs.signature !== statusSignature()) {
+    renderStatusTab(content);
+    return;
+  }
+  const bot = statusData.bot;
+  refs.ping.textContent = bot.latency === null ? "—" : bot.latency + " ms";
+  refs.uptime.textContent = fmtUptime(bot.uptime);
+  refs.servers.textContent = String(bot.guilds.length);
+  paintConsoleBox(refs.box);
+}
+
 function renderStatusTab(content) {
   if (!statusData || !statusData.ok) { content.replaceChildren(h("div", { class: "empty" }, "…")); return; }
   const bot = statusData.bot;
@@ -1499,12 +1546,10 @@ function renderStatusTab(content) {
   } else if (!statusData.token_ready) {
     nodes.push(h("div", { class: "msg error" }, tr("status.err.token_unreadable")));
   }
-  nodes.push(h("div", { class: "stat-grid wide-grid" },
-    stat(tr("stat.status"), tr("state." + bot.status)),
-    stat(tr("stat.ping"), bot.latency === null ? "—" : bot.latency + " ms"),
-    stat(tr("stat.uptime"), fmtUptime(bot.uptime)),
-    stat(tr("stat.servers"), String(bot.guilds.length))
-  ));
+  const pingStat = stat(tr("stat.ping"), bot.latency === null ? "—" : bot.latency + " ms");
+  const uptimeStat = stat(tr("stat.uptime"), fmtUptime(bot.uptime));
+  const serversStat = stat(tr("stat.servers"), String(bot.guilds.length));
+  nodes.push(h("div", { class: "stat-grid wide-grid" }, pingStat, uptimeStat, serversStat));
   const stopped = statusData.bot_state === "stopped";
   const paused = statusData.bot_state === "paused";
   const buttons = stopped
@@ -1527,8 +1572,10 @@ function renderStatusTab(content) {
           h("a", { href: "http://" + item.ip + ":" + net.port }, "http://" + item.ip + ":" + net.port),
           h("span", { class: "meta" }, tr("net." + item.kind) + (item.iface ? " · " + item.iface : "")))));
     })()));
-  nodes.push(h("div", { class: "section" }, h("h3", {}, tr("status.console")),
-    h("pre", { class: "console-box" }, consoleCache.length ? consoleCache.map(consoleLine).join("\n") : tr("status.console_empty"))));
+  const box = h("pre", { class: "console-box live" });
+  paintConsoleBox(box);
+  nodes.push(h("div", { class: "section" }, h("h3", {}, tr("status.console")), box));
+  statusRefs = { box, ping: pingStat.firstChild, uptime: uptimeStat.firstChild, servers: serversStat.firstChild, signature: statusSignature() };
   content.replaceChildren(h("div", { class: "panel wide" }, nodes));
 }
 
@@ -1862,6 +1909,43 @@ function agoText(ts) {
   return minutes < 1 ? tr("proxy.ago_now") : tr("proxy.ago_min", { n: minutes });
 }
 
+const openSubs = new Set();
+const shownSecrets = new Set();
+const deadlines = new Map();
+let proxyTick = null;
+let popBound = false;
+
+function bindPops() {
+  if (popBound) return;
+  popBound = true;
+  document.addEventListener("pointerdown", (event) => {
+    document.querySelectorAll(".touch-pop.shown").forEach(el => { if (!el.contains(event.target)) el.classList.remove("shown"); });
+  });
+}
+
+function touchPop(el, key) {
+  bindPops();
+  el.classList.add("touch-pop");
+  if (key && shownSecrets.has(key)) el.classList.add("shown");
+  el.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse") return;
+    const shown = el.classList.toggle("shown");
+    if (key) { if (shown) shownSecrets.add(key); else shownSecrets.delete(key); }
+  });
+  return el;
+}
+
+function fmtCountdown(seconds) {
+  const total = Math.max(0, Math.floor(seconds));
+  return pad(Math.floor(total / 3600)) + ":" + pad(Math.floor(total % 3600 / 60)) + ":" + pad(total % 60);
+}
+
+function pingDot(row) {
+  if (!row.status) return "";
+  if (!row.status.ok) return "error";
+  return row.status.ms > 3000 ? "wait" : "online";
+}
+
 function proxySection() {
   const text = h("textarea", { class: "proxy-input", spellcheck: "false", placeholder: tr("proxy.placeholder"), maxlength: "400000" });
   const list = h("div", { class: "proxy-list" });
@@ -1869,17 +1953,83 @@ function proxySection() {
   const count = h("span", { class: "meta" });
   const checked = h("span", { class: "meta" });
   const addButton = h("button", { class: "btn", type: "button" }, tr("proxy.add"));
-  const subs = h("div", { class: "proxy-list" });
+  const subs = h("div", { class: "sub-list" });
+  const busy = new Set();
+  let last = null;
 
-  function statusOf(row, limit) {
-    if (row.active) return ["online", tr("proxy.active") + (row.status && row.status.ms ? " · " + row.status.ms + " ms" : "")];
-    if (!row.status) return ["", tr("proxy.unknown")];
-    if (row.status.ok) return ["online", tr("proxy.ok")];
-    const hours = Math.floor((row.down || 0) / 3600);
-    return ["error", hours > 0 ? tr("proxy.down_for", { h: hours, limit: Math.round(limit / 3600) }) : tr("proxy.failed")];
+  function anchor(data) {
+    const now = Date.now();
+    const alive = new Set();
+    for (const row of data.entries) {
+      if (row.left === null || row.left === undefined) continue;
+      alive.add(row.id);
+      const fresh = now + row.left * 1000;
+      const known = deadlines.get(row.id);
+      if (known === undefined || Math.abs(known - fresh) > 60000) deadlines.set(row.id, fresh);
+    }
+    for (const id of [...deadlines.keys()]) if (!alive.has(id)) deadlines.delete(id);
+  }
+
+  function tick() {
+    if (!list.isConnected) { clearInterval(proxyTick); proxyTick = null; return; }
+    const now = Date.now();
+    document.querySelectorAll(".proxy-timer[data-id]").forEach(el => {
+      const end = deadlines.get(el.dataset.id);
+      if (end !== undefined) el.firstChild.textContent = fmtCountdown((end - now) / 1000);
+    });
+  }
+
+  function stateCell(row) {
+    if (!row.status) return h("span", { class: "proxy-state" }, "—");
+    if (row.status.ok) return h("span", { class: "proxy-state" }, row.status.ms ? row.status.ms + " ms" : "—");
+    const end = deadlines.get(row.id);
+    if (end === undefined) return h("span", { class: "proxy-state" }, "—");
+    return touchPop(h("span", { class: "proxy-state proxy-timer", "data-id": row.id },
+      h("span", {}, fmtCountdown((end - Date.now()) / 1000)),
+      h("span", { class: "tip", role: "tooltip" }, tr("proxy.timer_tip"))), "t:" + row.id);
+  }
+
+  function pingButton(key, title, action) {
+    return h("button", {
+      class: "btn secondary small icon-btn" + (busy.has(key) ? " busy" : ""), type: "button", title,
+      disabled: busy.has(key), onclick: action
+    }, icon("speed"));
+  }
+
+  function serverRow(row, index) {
+    return h("div", { class: "proxy-row" + (row.active ? " active" : "") },
+      h("span", { class: "proxy-num" }, String(index + 1)),
+      h("span", { class: "dot " + pingDot(row) }),
+      h("span", { class: "badge" }, row.type),
+      h("div", { class: "proxy-name" },
+        h("div", { class: "proxy-label" }, row.label),
+        row.desc ? h("div", { class: "proxy-desc" }, row.desc) : null),
+      stateCell(row),
+      pingButton(row.id, tr("proxy.ping"), () => pingOne(row.id)),
+      h("button", { class: "btn secondary small icon-btn", type: "button", title: tr("proxy.edit"), onclick: () => openProxyDialog(row.id, (res) => { paint(res); }) }, icon("edit")),
+      h("button", { class: "btn secondary small", type: "button", title: tr("proxy.remove"), onclick: () => remove(row.id) }, "×"));
+  }
+
+  function subCard(sub, rows) {
+    const open = openSubs.has(sub.id);
+    const flip = () => { if (open) openSubs.delete(sub.id); else openSubs.add(sub.id); paint(last); };
+    const secret = touchPop(h("span", { class: "spoiler", title: tr("proxy.secret") }, sub.url), "s:" + sub.id);
+    secret.addEventListener("click", (event) => event.stopPropagation());
+    return h("div", { class: "sub-card" + (open ? " open" : "") },
+      h("div", { class: "sub-head" },
+        h("button", { class: "sub-toggle", type: "button", title: tr(open ? "proxy.hide" : "proxy.show"), "aria-expanded": open ? "true" : "false", onclick: flip }, icon("chevron")),
+        h("div", { class: "sub-name", onclick: flip }, secret),
+        h("span", { class: "sub-count", onclick: flip }, tr("proxy.sub_count", { n: sub.count })),
+        pingButton("sub:" + sub.id, tr("proxy.ping_sub"), () => pingSub(sub.id)),
+        h("button", { class: "btn secondary small", type: "button", onclick: () => updateSub(sub.id) }, tr("proxy.sub_update")),
+        h("button", { class: "btn secondary small", type: "button", title: tr("proxy.remove"), onclick: () => removeSub(sub.id) }, "×")),
+      open ? h("div", { class: "sub-body" }, rows.length ? rows.map(serverRow) : h("div", { class: "empty" }, tr("proxy.empty_sub"))) : null);
   }
 
   function paint(data) {
+    if (!data) return;
+    last = data;
+    anchor(data);
     count.textContent = tr("proxy.count", { n: data.entries.length, max: data.max });
     checked.textContent = tr("proxy.checked", { t: agoText(data.checked) });
     const notes = [];
@@ -1887,29 +2037,35 @@ function proxySection() {
     if (data.binary.state === "error") notes.push(h("div", { class: "msg error" }, tr("proxy.xray_error", { detail: data.binary.detail })));
     if (data.internet === false) notes.push(h("div", { class: "msg info" }, tr("proxy.no_internet")));
     note.replaceChildren(...notes);
-    subs.replaceChildren(...data.subs.map(sub => h("div", { class: "proxy-row sub" },
-      h("span", { class: "badge" }, "sub"),
-      h("span", { class: "proxy-label" }, sub.label),
-      h("span", { class: "proxy-state" }, tr("proxy.sub_count", { n: sub.count })),
-      h("button", { class: "btn secondary small", type: "button", onclick: () => updateSub(sub.id) }, tr("proxy.sub_update")),
-      h("button", { class: "btn secondary small", type: "button", title: tr("proxy.remove"), onclick: () => removeSub(sub.id) }, "×"))));
-    if (!data.entries.length) { list.replaceChildren(h("div", { class: "empty" }, tr("proxy.empty"))); return; }
-    list.replaceChildren(...data.entries.map((row, index) => {
-      const [dot, label] = statusOf(row, data.limit || 86400);
-      return h("div", { class: "proxy-row" },
-        h("span", { class: "proxy-num" }, String(index + 1)),
-        h("span", { class: "badge" }, row.type),
-        h("span", { class: "proxy-label" }, row.label),
-        h("span", { class: "proxy-state" }, h("span", { class: "dot " + dot }), label),
-        h("button", { class: "btn secondary small icon-btn", type: "button", title: tr("proxy.edit"), onclick: () => openProxyDialog(row.id, (res) => { paint(res); }) }, icon("edit")),
-        h("button", { class: "btn secondary small", type: "button", title: tr("proxy.remove"), onclick: () => remove(row.id) }, "×")
-      );
-    }));
+    subs.replaceChildren(...data.subs.map(sub => subCard(sub, data.entries.filter(row => row.sub === sub.id))));
+    const loose = data.entries.filter(row => !row.sub);
+    if (!loose.length) list.replaceChildren(data.subs.length ? "" : h("div", { class: "empty" }, tr("proxy.empty")));
+    else list.replaceChildren(...loose.map(serverRow));
+    if (!proxyTick) proxyTick = setInterval(tick, 1000);
   }
 
   async function refresh() {
     const res = await api("GET", "/api/proxy");
-    if (res.ok) paint(res);
+    if (res.ok && !busy.size) paint(res);
+  }
+
+  async function pingOne(id) {
+    busy.add(id);
+    paint(last);
+    const res = await api("POST", "/api/proxy/" + encodeURIComponent(id) + "/ping", {});
+    busy.delete(id);
+    if (!res.ok) { toast(errorText(res), "error"); paint(last); return; }
+    paint(res);
+  }
+
+  async function pingSub(id) {
+    busy.add("sub:" + id);
+    paint(last);
+    const res = await api("POST", "/api/proxy/sub/" + encodeURIComponent(id) + "/ping", {});
+    busy.delete("sub:" + id);
+    if (!res.ok) { toast(errorText(res), "error"); paint(last); return; }
+    paint(res);
+    toast(tr("proxy.pinged"), "ok");
   }
 
   async function remove(id) {
@@ -1923,13 +2079,14 @@ function proxySection() {
     const res = await api("POST", "/api/proxy/sub/" + encodeURIComponent(id) + "/update", {});
     if (!res.ok) { toast(errorText(res) + (res.detail ? " (" + res.detail + ")" : ""), "error"); return; }
     paint(res);
-    toast(tr("proxy.sub_updated", { n: res.subs.find(s => s.id === id)?.count ?? 0 }), "ok");
+    toast(tr("proxy.sub_updated", { n: res.added, total: res.subs.find(s => s.id === id)?.count ?? 0 }), "ok");
   }
 
   async function removeSub(id) {
     if (!(await confirmDialog(tr("confirm.sub_remove")))) return;
     const res = await api("DELETE", "/api/proxy/sub/" + encodeURIComponent(id), {});
     if (!res.ok) { toast(errorText(res), "error"); return; }
+    openSubs.delete(id);
     paint(res);
   }
 
@@ -1945,21 +2102,22 @@ function proxySection() {
     text.value = "";
     paint(res);
     if (lines.length) note.append(h("div", { class: "msg info" }, tr("proxy.added", { n: res.added }) + " " + tr("proxy.skipped", { list: lines.join("; ") })));
-    else toast(tr("proxy.added", { n: res.added }), "ok");
+    else toast(res.added ? tr("proxy.added", { n: res.added }) : tr("proxy.nothing_new"), "ok");
   });
 
   proxyRefresh = refresh;
+  if (proxyTick) { clearInterval(proxyTick); proxyTick = null; }
   refresh();
 
   return h("div", { class: "section" },
     h("p", { class: "meta" }, tr("proxy.hint", { max: 1000 })),
+    text,
+    h("div", { class: "actions add-actions" }, addButton,
+      h("button", { class: "btn secondary", type: "button", onclick: () => openProxyDialog(null, (res) => { paint(res); toast(tr("proxy.added", { n: 1 }), "ok"); }) }, tr("proxy.form"))),
     h("div", { class: "proxy-meta" }, count, checked),
     note,
     subs,
-    list,
-    text,
-    h("div", { class: "actions" }, addButton,
-      h("button", { class: "btn secondary", type: "button", onclick: () => openProxyDialog(null, (res) => { paint(res); toast(tr("proxy.added", { n: 1 }), "ok"); }) }, tr("proxy.form")))
+    list
   );
 }
 
@@ -2332,7 +2490,7 @@ function dataSection() {
       handler: async (password) => {
         const res = await api("POST", "/api/data/import", { export: parsed, passphrase: password });
         if (!res.ok) return errorText(res);
-        out.replaceChildren(h("div", { class: "msg ok" }, tr("data.imported", { g: res.guilds, n: res.strikes })));
+        out.replaceChildren(h("div", { class: "msg ok" }, tr("data.imported", { g: res.guilds, n: res.strikes, p: res.proxies || 0 })));
         return null;
       }
     });

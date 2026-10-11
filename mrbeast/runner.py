@@ -48,8 +48,12 @@ class BotRunner:
         self.direct_fallback = False
 
     async def start(self, token: str):
+        restarting = self.running
         await self.stop()
         console.mark_activation()
+        console.fold_cancel()
+        if restarting:
+            console.fold_begin("restart")
         self.error = ""
         self.running = True
         self.stop_event = asyncio.Event()
@@ -87,7 +91,7 @@ class BotRunner:
             if stop_event.is_set():
                 break
             if proxy_died:
-                logger.warning("A proxy changed state (failed, slowed down or came back), choosing the best one again")
+                console.fold_begin("switch" if pool.watch_reason == "better" else "lost")
                 await pool.release()
                 delay = 5
                 continue
@@ -97,6 +101,7 @@ class BotRunner:
             if isinstance(result, discord.PrivilegedIntentsRequired):
                 self.error = "intents"
                 break
+            console.fold_begin("network")
             if isinstance(result, BaseException):
                 logger.error(f"Connection error: {result}")
                 self.error = "network"
@@ -108,6 +113,7 @@ class BotRunner:
             delay = min(delay * 2, 60)
         state.proxy_url = None
         self.running = False
+        console.fold_cancel()
 
     async def pause(self, stop_event: asyncio.Event, seconds: float) -> bool:
         try:

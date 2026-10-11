@@ -4,6 +4,7 @@ import os
 import signal
 import sys
 
+import discord
 from aiohttp import web
 
 from .config import BASE_DIR
@@ -71,6 +72,8 @@ def print_banner(port: int):
 
 class QuietReconnects(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
+        if record.name.startswith("discord") and "voice will NOT be supported" in str(record.msg):
+            return False
         if record.name == "asyncio" and str(record.msg).startswith("Unclosed connection"):
             return False
         if record.name == "discord.client" and str(record.msg).startswith("Attempting a reconnect"):
@@ -111,6 +114,9 @@ async def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     logging.getLogger("aiohttp.access").setLevel(logging.WARNING)
     logging.getLogger().addHandler(console)
+    for flag in ("warn_nacl", "warn_dave"):
+        if hasattr(discord.VoiceClient, flag):
+            setattr(discord.VoiceClient, flag, False)
     quiet = QuietReconnects()
     for handler in logging.getLogger().handlers:
         handler.addFilter(quiet)

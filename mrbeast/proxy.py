@@ -23,6 +23,7 @@ from . import happ_crypt
 from cryptography.fernet import Fernet, InvalidToken
 
 from .config import BIN_DIR, PROXIES_FILE, XRAY_DIR, ensure_dirs, write_bytes_atomic, write_json
+from .utils import read_capped
 
 logger = logging.getLogger("mrbeast.proxy")
 
@@ -39,6 +40,10 @@ SLOW_MS = 3000
 PROBE_CHUNK = 60
 RECHECK_INTERVAL = 300
 MAINTAIN_INTERVAL = 600
+ROUTE_TRIES = 5
+GONE_LIMIT = 2000
+TRANSIENT_KEYS = ("down", "down_since", "seen")
+DESC_PATTERN = re.compile(r"[?&]serverDescription=([^&#\s]*)")
 DOWN_LIMIT = 86400
 PENALTY_SECONDS = 180
 SUB_AGENTS = (
@@ -62,8 +67,33 @@ class ParseError(ValueError):
         self.code = code
 
 
+def split_label(label: str) -> tuple[str, str]:
+    match = DESC_PATTERN.search(label)
+    if not match:
+        return label, ""
+    head = label[:match.start()]
+    if "?" in label[:match.end()] and match.group(0)[0] == "&":
+        head = label[:label.index("?")]
+    raw = unquote(match.group(1)).replace("-", "+").replace("_", "/")
+    raw += "=" * (-len(raw) % 4)
+    try:
+        desc = base64.b64decode(raw).decode("utf-8").strip()
+    except (ValueError, UnicodeDecodeError):
+        desc = ""
+    return head.strip(), desc
+
+
 def make_entry(kind: str, label: str, **data) -> dict:
-    return {"id": secrets.token_hex(4), "type": kind, "label": label[:80], **data}
+    name, desc = split_label(label)
+    entry = {"id": secrets.token_hex(4), "type": kind, "label": (name or label)[:80], **data}
+    if desc:
+        entry["desc"] = desc[:200]
+    return entry
+
+
+def fingerprint(entry: dict) -> str:
+    core = entry["outbound"] if entry.get("outbound") is not None else entry.get("url")
+    return hashlib.sha1(json.dumps(core, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
 def parts_of(line: str):
@@ -723,25 +753,26 @@ async def fetch_body(url: str, agent: str, via: str | None, hwid: str = "") -> s
         async with session.get(url, proxy=via) as resp:
             if resp.status != 200:
                 raise RuntimeError(f"HTTP {resp.status}")
-            data = await resp.content.read(SUB_MAX_BYTES + 1)
+            data = await read_capped(resp, SUB_MAX_BYTES)
             if len(data) > SUB_MAX_BYTES:
                 raise SubError("sub_too_large")
             return data.decode("utf-8", errors="replace")
 
 
-async def resolve_url(url: str, via: str | None = None) -> str:
+async def resolve_url(url: str, pool=None) -> str:
     if not url.lower().startswith("happ://crypt5/"):
         return url
     try:
-        return await happ_crypt.resolve(url, via)
+        return await happ_crypt.resolve(url, pool)
     except happ_crypt.CryptError as e:
         raise SubError(e.code)
 
 
-async def load_subscription(url: str, via: str | None = None, hwid: str = "") -> tuple[list[dict], int]:
-    url = await resolve_url(url, via)
-    last_code, last_detail = "sub_fetch_failed", ""
-    for route in ((None, via) if via else (None,)):
+async def load_subscription(url: str, pool=None, hwid: str = "") -> tuple[list[dict], int]:
+    url = await resolve_url(url, pool)
+
+    async def attempt(route):
+        last_code, last_detail = "sub_fetch_failed", ""
         for agent in SUB_AGENTS:
             try:
                 body = await fetch_body(url, agent, route, hwid)
@@ -762,7 +793,14 @@ async def load_subscription(url: str, via: str | None = None, hwid: str = "") ->
             if entries:
                 return entries, skipped
             last_code, last_detail = "sub_empty", f"skipped {skipped}"
-    raise SubError(last_code, last_detail)
+        raise SubError(last_code, last_detail)
+
+    try:
+        return await (pool.with_routes(attempt) if pool is not None else attempt(None))
+    except SubError:
+        raise
+    except Exception as e:
+        raise SubError("sub_fetch_failed", type(e).__name__)
 
 
 async def internet_up() -> bool:
@@ -925,12 +963,15 @@ class ProxyPool:
         self.binary = {"state": "", "detail": ""}
         self.xray = Xray("main")
         self.prober = Xray("probe")
+        self.fetcher = Xray("fetch")
         self.probe_lock = asyncio.Lock()
+        self.spare_lock = asyncio.Lock()
         self.dirty = False
         self.last_full = 0.0
         self.penalty: dict[str, float] = {}
         self.checked = 0
         self.internet = True
+        self.watch_reason = ""
 
     def load(self) -> tuple[list[dict], list[dict]]:
         try:
@@ -965,6 +1006,12 @@ class ProxyPool:
         kept = [e for e in self.entries if e["id"] != entry_id]
         if len(kept) == len(self.entries):
             return False
+        gone = next(e for e in self.entries if e["id"] == entry_id)
+        sub = next((x for x in self.subs if x["id"] == gone.get("sub")), None)
+        if sub is not None:
+            marks = sub.setdefault("gone", [])
+            marks.append(fingerprint(gone))
+            del marks[:-GONE_LIMIT]
         self.entries = kept
         self.status.pop(entry_id, None)
         if self.active == entry_id:
@@ -978,6 +1025,8 @@ class ProxyPool:
                 fresh["id"] = entry_id
                 if entry.get("sub"):
                     fresh["sub"] = entry["sub"]
+                if entry.get("desc") and not fresh.get("desc"):
+                    fresh["desc"] = entry["desc"]
                 self.entries[index] = fresh
                 self.status.pop(entry_id, None)
                 if self.active == entry_id:
@@ -986,20 +1035,29 @@ class ProxyPool:
                 return True
         return False
 
-    def set_subscription(self, url: str, entries: list[dict], sub_id: str | None = None) -> dict:
-        sub = next((s for s in self.subs if s["id"] == sub_id), None)
+    def merge_subscription(self, url: str, entries: list[dict], sub_id: str | None = None) -> tuple[dict, int]:
+        sub = next((x for x in self.subs if x["id"] == sub_id), None)
         if sub is None:
             sub = {"id": secrets.token_hex(4), "url": url, "label": (urlsplit(url).hostname or url)[:60]}
             self.subs.append(sub)
-        self.entries = [e for e in self.entries if e.get("sub") != sub["id"]]
+        have = {fingerprint(e) for e in self.entries}
+        gone = set(sub.get("gone", []))
         room = max(0, MAX_PROXIES - len(self.entries))
-        for entry in entries[:room]:
+        added = 0
+        for entry in entries:
+            mark = fingerprint(entry)
+            if mark in have or mark in gone:
+                continue
+            if added >= room:
+                break
             entry["sub"] = sub["id"]
             self.entries.append(entry)
-        sub["count"] = min(len(entries), room)
+            have.add(mark)
+            added += 1
+        sub["count"] = sum(1 for e in self.entries if e.get("sub") == sub["id"])
         sub["updated"] = int(time.time())
         self.save()
-        return sub
+        return sub, added
 
     def remove_subscription(self, sub_id: str) -> bool:
         kept = [s for s in self.subs if s["id"] != sub_id]
@@ -1012,17 +1070,122 @@ class ProxyPool:
         self.save()
         return True
 
+    def max_entries(self) -> int:
+        return MAX_PROXIES
+
+    def left_seconds(self, entry: dict, now: float) -> int:
+        spent = entry.get("down", 0)
+        if self.internet:
+            spent += max(0.0, min(now - (entry.get("seen") or now), CHECK_GAP_CAP))
+        return max(0, int(DOWN_LIMIT - spent))
+
     def view(self) -> dict:
         rows = []
+        now = time.time()
         for entry in self.entries:
             kind = entry.get("protocol", "xray") if entry["type"] == "xray" else entry["type"]
+            name, legacy = split_label(entry["label"])
+            status = self.status.get(entry["id"])
             rows.append({
-                "id": entry["id"], "type": kind, "label": entry["label"], "sub": entry.get("sub", ""),
-                "active": entry["id"] == self.active, "status": self.status.get(entry["id"]),
+                "id": entry["id"], "type": kind, "label": name or entry["label"], "desc": entry.get("desc") or legacy,
+                "sub": entry.get("sub", ""), "active": entry["id"] == self.active, "status": status,
                 "down": int(entry.get("down", 0)),
+                "left": self.left_seconds(entry, now) if status and not status.get("ok") and entry["id"] != self.active else None,
             })
-        subs = [{"id": s["id"], "label": s["label"], "count": s.get("count", 0), "updated": s.get("updated", 0)} for s in self.subs]
+        counts: dict[str, int] = {}
+        for entry in self.entries:
+            if entry.get("sub"):
+                counts[entry["sub"]] = counts.get(entry["sub"], 0) + 1
+        subs = [{"id": s["id"], "label": s["label"], "url": s["url"], "count": counts.get(s["id"], 0), "updated": s.get("updated", 0)} for s in self.subs]
         return {"entries": rows, "subs": subs, "max": MAX_PROXIES, "binary": self.binary, "checked": self.checked, "internet": self.internet, "limit": DOWN_LIMIT}
+
+    def spare(self, limit: int) -> list[dict]:
+        ranked = [e for e in self.entries if e["id"] != self.active and (self.status.get(e["id"]) or {}).get("ok")]
+        ranked.sort(key=lambda e: self.status[e["id"]].get("ms") or 10 ** 9)
+        return ranked[:limit]
+
+    async def open_spare(self, entry: dict) -> str | None:
+        if entry["type"] == "http":
+            return entry["url"]
+        binary = await self.ensure_binary()
+        if not binary:
+            return None
+        port = free_ports(1)[0]
+        error = await self.fetcher.start(binary, build_xray_config(entry["outbound"], port), port)
+        if error:
+            await self.fetcher.stop()
+            return None
+        return f"http://127.0.0.1:{port}"
+
+    async def with_routes(self, action, direct_first: bool = True, limit: int = ROUTE_TRIES):
+        routes = [None] + ([self.url] if self.url else [])
+        if not direct_first:
+            routes.reverse()
+        last: Exception | None = None
+        for route in routes:
+            try:
+                return await action(route)
+            except Exception as e:
+                last = e
+        async with self.spare_lock:
+            for entry in self.spare(limit):
+                url = await self.open_spare(entry)
+                if not url:
+                    continue
+                try:
+                    return await action(url)
+                except Exception as e:
+                    last = e
+                finally:
+                    await self.fetcher.stop()
+        raise last if last else RuntimeError("no route")
+
+    def export_data(self) -> dict:
+        entries = [{k: v for k, v in e.items() if k not in TRANSIENT_KEYS} for e in self.entries]
+        subs = [{k: v for k, v in x.items() if k != "gone"} for x in self.subs]
+        return {"entries": entries, "subs": subs}
+
+    def import_data(self, data) -> int:
+        if not isinstance(data, dict):
+            return 0
+        mapping: dict[str, str] = {}
+        for item in data.get("subs") if isinstance(data.get("subs"), list) else []:
+            if not isinstance(item, dict) or not isinstance(item.get("url"), str) or not isinstance(item.get("id"), str):
+                continue
+            known = next((x for x in self.subs if x["url"] == item["url"]), None)
+            if known is None:
+                known = {"id": secrets.token_hex(4), "url": item["url"][:2000], "label": str(item.get("label") or "")[:60], "count": 0, "updated": int(item.get("updated") or 0)}
+                self.subs.append(known)
+            mapping[item["id"]] = known["id"]
+        have = {fingerprint(e) for e in self.entries}
+        added = 0
+        for item in data.get("entries") if isinstance(data.get("entries"), list) else []:
+            if added >= max(0, MAX_PROXIES - len(self.entries)):
+                break
+            if not isinstance(item, dict) or not isinstance(item.get("type"), str) or not isinstance(item.get("label"), str):
+                continue
+            if item["type"] == "http":
+                if not isinstance(item.get("url"), str) or not item["url"].startswith("http://"):
+                    continue
+            elif not isinstance(item.get("outbound"), dict) or not isinstance(item["outbound"].get("protocol"), str):
+                continue
+            entry = {k: v for k, v in item.items() if k not in TRANSIENT_KEYS}
+            entry["id"] = secrets.token_hex(4)
+            entry["label"] = entry["label"][:80]
+            if entry.get("sub") in mapping:
+                entry["sub"] = mapping[entry["sub"]]
+            else:
+                entry.pop("sub", None)
+            mark = fingerprint(entry)
+            if mark in have:
+                continue
+            have.add(mark)
+            self.entries.append(entry)
+            added += 1
+        for sub in self.subs:
+            sub["count"] = sum(1 for e in self.entries if e.get("sub") == sub["id"])
+        self.save()
+        return added
 
     def binary_path(self) -> str | None:
         for candidate in (os.environ.get("MRBEAST_XRAY"), shutil.which("xray"), str(BIN_DIR / "xray")):
@@ -1121,13 +1284,14 @@ class ProxyPool:
         finally:
             await self.prober.stop()
 
-    async def probe_all(self, only_failed: bool = False) -> dict:
+    async def probe_all(self, only_failed: bool = False, ids: set[str] | None = None) -> dict:
         async with self.probe_lock:
             results: dict = {}
             gate = asyncio.Semaphore(20)
             targets = [
                 e for e in self.entries
-                if not only_failed or e["id"] != self.active and not (self.status.get(e["id"]) or {}).get("ok")
+                if (ids is None or e["id"] in ids)
+                and (not only_failed or e["id"] != self.active and not (self.status.get(e["id"]) or {}).get("ok"))
             ]
 
             async def direct(entry):
@@ -1190,7 +1354,7 @@ class ProxyPool:
                 if ok:
                     self.active, self.url, self.last_full = entry["id"], url, time.monotonic()
                     self.flush()
-                    logger.info(f"Using proxy {entry['label']} ({ms} ms)")
+                    logger.info(f"Using proxy {split_label(entry['label'])[0]} ({ms} ms)")
                     return url
         await self.xray.stop()
         self.active, self.url = "", None
@@ -1203,9 +1367,11 @@ class ProxyPool:
             await asyncio.sleep(WATCH_INTERVAL)
             active = next((e for e in self.entries if e["id"] == self.active), None)
             if active is None:
+                self.watch_reason = "lost"
                 return
             if active["type"] != "http" and not self.xray.alive():
                 self.record(self.active, False, 0, "xray stopped")
+                self.watch_reason = "lost"
                 return
             ok, ms, error = await probe(self.url)
             if not ok and not await internet_up():
@@ -1216,6 +1382,7 @@ class ProxyPool:
             if not ok:
                 misses += 1
                 if misses >= 2:
+                    self.watch_reason = "lost"
                     return
                 continue
             misses = 0
@@ -1224,6 +1391,7 @@ class ProxyPool:
                 self.last_full = time.monotonic()
                 better = [(r[1], i) for i, r in results.items() if r[0] and i != self.active]
                 if better and min(better)[0] < ms:
+                    self.watch_reason = "better"
                     return
 
     def penalize(self):
@@ -1245,6 +1413,7 @@ class ProxyPool:
                 logger.error(f"Background check failed: {e!r}")
                 continue
             if any(r[0] for r in results.values()):
+                self.watch_reason = "better"
                 return
 
     async def maintain(self, stop: asyncio.Event):
@@ -1268,3 +1437,4 @@ class ProxyPool:
     async def stop(self):
         await self.release()
         await self.prober.stop()
+        await self.fetcher.stop()

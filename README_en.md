@@ -25,6 +25,7 @@ The bot detects an account that blasts the same images across several channels w
 - 🔐 Password login; the token, password, logs and images are stored in protected form
 - 🔑 Password reset through Discord (linked administrator account)
 - 🧹 Removal of a user's data from the logs by username or ID
+- 🛰️ Proxies and subscriptions (VLESS, SOCKS5, HTTP and more) for when Discord is blocked
 - 🌐 English and Russian: bot language and panel language are separate settings
 
 ---
@@ -121,12 +122,27 @@ Run `install.sh` inside the container or on the server the same way as in Termux
    | Moderate Members | applying timeouts |
    | Send Messages | reports in the log channel |
    | Embed Links | reports are sent as embeds |
+   | Ban Members | only for punishment presets that ban |
 
 5. Open the generated URL at the bottom of the page and add the bot to your server.
 
-⚠️ **The bot's role must be above the roles of the users it applies timeouts to** (Server Settings → Roles). Discord does not allow timeouts for administrators or the server owner.
+⚠️ **The bot's role must be above the roles of the users it gives timeouts to** (Server Settings → Roles). Discord does not allow timeouts for administrators or the server owner.
 
-For the bot to grant itself access to the log channel, additionally give it **Manage Channels** (optional). Without it, allow the bot to post in the log channel manually.
+<details>
+<summary><b>The bot's role, its colour and private channels</b></summary>
+
+<br>
+
+Discord creates a role named after the bot when it joins, with the permissions that were in the link from step 4. If none were ticked, the role comes out empty. To fix it:
+
+- generate the link again with the permissions from the table and open it on your server (the role's permissions are updated);
+- or do it by hand: **Server Settings → Roles →** the role named after the bot → enable the permissions from the table.
+
+A role colour can't be set through the link: open the same role and set **#8000FF** (RGB 128, 0, 255).
+
+Channels that regular users can't see (for example the log channel): the bot's role needs **View Channels** on the server, and if the channel has its own permission overrides, add the bot's role there with **View Channel**, **Send Messages** and **Embed Links**. For the bot to grant itself access to the log channel you can give it **Manage Channels** (optional).
+
+</details>
 
 ---
 
@@ -143,15 +159,20 @@ For the bot to grant itself access to the log channel, additionally give it **Ma
 | Section | Contents |
 |---|---|
 | **Offenders** | Latest records as Discord-style messages: offender display name, username and ID, trigger text, channel link, images (identical ones stored once), action. Updates automatically |
-| **Status** | Bot state, ping, uptime, control buttons, panel addresses on the network |
-| **Servers** | The server list and per server (Telegram-style picker with smart search): punishment preset, steps, reasons, detection reset period, log channel, auto-detection thresholds |
-| **Proxy** | Proxy and subscription list, state of each entry, time of the last check, entry editor |
+| **Status** | Ping, uptime, control buttons, panel addresses on the network, the last 20 console lines. The bot's state is a coloured capsule under its name on the left (green: online, orange: connecting, red: paused or stopped) |
+| **Servers** | The server list and per server: punishment preset, steps, reasons, detection reset period, log channel, auto-detection thresholds |
+| **Proxy** | The add form is at the top. Single proxies are a plain list, subscriptions expand with an arrow (the link is hidden by a "spoiler" until hover or tap). Every server shows ping in ms, the provider's description, a manual ping button (speedometer icon, for a subscription it checks all its servers) and an editor. A server that is down shows a countdown to automatic removal |
 | **Logs** | Console log across the whole page with export |
 | **Settings** | Languages, administrator account link, token replacement, updates, removal of a user's data |
 
+Details for each section expand in the blocks below.
+
 In the panel logs, offender fields, trigger text and channel names are cut to 69 characters so spam can't bloat the history. Videos are not saved. Records are kept for at most 30 days (and at most 300 records).
 
-<h3 align="center">Administrator account link and password reset</h3>
+<details>
+<summary><b>Account link and password reset</b></summary>
+
+<br>
 
 The link is required to recover the password.
 
@@ -168,18 +189,20 @@ Without a linked account the password can be recovered with **security questions
 
 If neither a linked account nor questions exist, the recovery page shows the command that reinstalls the bot for your device (Termux or other). Reinstalling deletes all bot data.
 
-<h3 align="center">Bot control</h3>
+</details>
 
-The bot status (online, paused, stopped) is always shown at the top of the panel. The **Status** tab has **Pause / Resume**, **Restart** and **Stop / Start** buttons. While paused, the bot does not react to image spam and manual commands still work; stopping disconnects the bot from Discord completely while the panel stays available. The chosen state is kept after a restart. The server list is in the **Servers** tab.
+<details>
+<summary><b>Bot control (pause, restart, stop)</b></summary>
+
+<br>
+
+The bot's state is shown by a coloured capsule under its name (online, connecting, paused, stopped). The **Status** tab has **Pause / Resume**, **Restart** and **Stop / Start** buttons. While paused, the bot does not react to image spam and manual commands still work; stopping disconnects the bot from Discord completely while the panel stays available. The chosen state is kept after a restart.
+
+</details>
 
 <h3 align="center">Proxy (if Discord is blocked)</h3>
 
-In the **Proxy** tab you can add up to 100 entries: links, configs and subscription links go into one field.
-
-- On every connection the bot checks **all** entries, connects to the fastest one and chooses again if it stops responding. If the selected entry's ping is above 1000 ms the bot looks for a faster one; if there is none, it stays on the fastest available.
-- If no entry works, the bot connects **directly**.
-- In the background, every 10 minutes all entries (including unused ones) are checked. If the bot is connected directly and some entry comes back, it switches to it by itself.
-- An entry that does not respond for a total of one day is removed from the list automatically. The time is counted only while the device has internet: short network drops and phone sleep are not counted.
+The **Proxy** tab holds up to 1000 entries: links, configs and subscriptions go into one field. The bot picks the fastest entry by itself, switches when it fails, and connects directly if none works. An entry counts as working only if Discord is reachable through it.
 
 Accepted (one link per line, or one or several configs in a row):
 
@@ -192,11 +215,38 @@ Accepted (one link per line, or one or several configs in a row):
 | VMess, Trojan, Shadowsocks | `vmess://…`, `trojan://…`, `ss://…` |
 | Subscription | `https://provider/sub/…` (or `happ://add/…`, `v2raytun://import/…`, `clash://install-config?url=…`): the bot downloads the server list, the "Update" button re-reads it |
 
-VLESS links support the `tcp`, `ws`, `grpc`, `httpupgrade` and `xhttp` transports and `none`, `tls`, `reality` security. For a JSON config the outbound proxy is taken (the one tagged `proxy`, or the first suitable one); other Xray protocols in such a config work too. Subscription entries of other types (hysteria, tuic, etc.) are skipped. A subscription is requested with several User-Agent headers in turn (Happ, v2rayN, a browser, curl), because providers answer different clients differently. Encrypted `happ://crypt5/…` links are decrypted locally with keys from a public list (github.com/cylaro/happ-decrypt, downloaded once into `data/cache`); the subscription itself is never sent anywhere. Older `crypt`, `crypt2`–`crypt4` are not supported. sing-box configs (the `outbounds` field), several configs in a row and `tg://socks` links are accepted as well. Telegram MTProto proxies (`tg://proxy`) cannot carry Discord traffic and are rejected. The list limit is 1000 entries. Each entry has an editor (pencil) and there is a form for adding without links.
+<details>
+<summary><b>How the bot chooses and cleans up proxies</b></summary>
 
-For SOCKS5, VLESS and configs the bot uses the **Xray** core. It is downloaded automatically from GitHub on first use (with a checksum check) to `data/bin/xray`. If GitHub is unavailable, put the `xray` file into that folder manually. Entries and subscription links are stored in `data/proxies.json` in encrypted form.
+<br>
 
-**If the subscription can't be downloaded from the phone** (for example, the subscription server blocks your IP), run this on a computer (Windows, Linux or macOS, Python 3 required):
+- On every connection the bot checks **all** entries, connects to the fastest one and chooses again if it stops responding. If the selected entry's ping is above 1000 ms the bot looks for a faster one; if there is none, it stays on the fastest available.
+- If no entry works, the bot connects **directly**.
+- In the background, every 10 minutes all entries (including unused ones) are checked. If the bot is connected directly and some entry comes back, it switches to it by itself.
+- An entry that does not respond for a total of one day is removed from the list automatically. The time is counted only while the device has internet: short network drops and phone sleep are not counted. Such an entry shows a red dot and a countdown to removal.
+
+</details>
+
+<details>
+<summary><b>Subscriptions, links and encryption</b></summary>
+
+<br>
+
+- **Formats.** VLESS: `tcp`, `ws`, `grpc`, `httpupgrade`, `xhttp` transports and `none`, `tls`, `reality` security. For a JSON config the outbound proxy is taken (the one tagged `proxy`, or the first suitable one); other Xray protocols in it work too. sing-box configs (the `outbounds` field), several configs in a row and `tg://socks` are accepted. Subscription entries of other types (hysteria, tuic, etc.) are skipped, and Telegram MTProto (`tg://proxy`) cannot carry Discord traffic and is rejected.
+- **Loading a subscription.** It is requested with several User-Agent headers in turn (Happ, v2rayN, a browser, curl), because providers answer clients differently. If a direct request fails (timeout, blocking), the panel tries the current proxy, then up to five of the fastest working ones. The `happ://crypt5` key list and the background picture are fetched the same way.
+- **Encrypted links.** `happ://crypt5/…` is decrypted locally with keys from a public list (github.com/cylaro/happ-decrypt, downloaded once into `data/cache`); the subscription itself is never sent anywhere. Older `crypt`, `crypt2`–`crypt4` are not supported. The decrypted address is saved as the subscription address.
+- **Updating a subscription** only adds new servers: ones already in the list (same address, port and keys) are left untouched, and servers the provider dropped stay in the list. A server you deleted by hand does not come back on update.
+- **Server description** from the `serverDescription` parameter is shown as grey text under its name.
+- **Xray and storage.** SOCKS5, VLESS and configs use the **Xray** core: it is downloaded from GitHub on first use (with a checksum check) to `data/bin/xray`; if GitHub is unavailable, put the `xray` file into that folder manually. Entries and subscription links are stored in `data/proxies.json` in encrypted form.
+
+</details>
+
+<details>
+<summary><b>If the subscription can't be downloaded from the phone</b></summary>
+
+<br>
+
+For example, when the subscription server blocks your IP. Run this on a computer (Windows, Linux or macOS, Python 3 required):
 
 ```bash
 python tools/subscription.py "https://provider/sub/…" -o servers.txt
@@ -204,17 +254,32 @@ python tools/subscription.py "https://provider/sub/…" -o servers.txt
 
 `servers.txt` contains the server links: open it and paste the content into the field in the Proxy tab.
 
-<h3 align="center">Updating from the panel</h3>
+</details>
+
+<details>
+<summary><b>Updating from the panel</b></summary>
+
+<br>
 
 1. Open **Settings → Updates** and click **"Check for updates"**.
 2. If a new version is available, the list of changes is shown. Enter the panel password and click **"Update now"**.
 3. The bot stops, downloads the update, checks dependencies and the new files, and starts again. Data and settings are kept. If anything fails, the previous version is restored. After the restart you need to sign in again.
 
-<h3 align="center">Removing a user's data</h3>
+</details>
+
+<details>
+<summary><b>Removing a user's data</b></summary>
+
+<br>
 
 In **Settings → Remove user data** enter the username (not the display name) or the ID. The panel shows the number of matching records. After confirmation, the display name, username and ID in those records are replaced with `null`, and the stored message text and images are removed; detection counters and console log lines mentioning the user are erased as well. A record with ID `null` is considered erased; a user whose name is literally "null" is not. The bot also deletes **its own** log messages about that user in the log channels of all servers (using the saved message references and by reading the channel history for 90 days); other messages are never touched. If the bot is offline, the Discord channels are not checked.
 
-<h3 align="center">Punishments, presets and counters</h3>
+</details>
+
+<details>
+<summary><b>Punishments, presets and counters</b></summary>
+
+<br>
 
 In the **Servers** tab each server gets a preset:
 
@@ -227,11 +292,30 @@ In the **Servers** tab each server gets a preset:
 
 The detection counter is kept per user per server and resets after the configured number of days without violations (30 by default, 90 at most). Nothing is stored longer than 90 days. The reason is written to the audit log; sending it to the offender in a direct message is off by default and is enabled with a checkbox in the server settings. On a ban Discord deletes messages for the chosen period (7 days at most).
 
-<h3 align="center">Settings transfer, console log, updates</h3>
+</details>
 
-- **Settings → Transfer settings**: "Import" on the left, "Export" on the right. Export asks for a password and saves a file with server settings, presets, reasons and counters; user IDs in the counters are encrypted with that password, offenders and logs are not included. Import opens a file picker, checks the file and asks for the password; records older than 90 days are dropped.
+<details>
+<summary><b>Settings transfer, console log, updates</b></summary>
+
+<br>
+
+- **Settings → Transfer settings**: "Import" on the left, "Export" on the right. Export asks for a password and saves a file with server settings, presets, reasons, counters and proxies (subscriptions together with their servers, as they currently are in the list); user IDs and proxy data are encrypted with that password, offenders and logs are not included. Import opens a file picker, checks the file and asks for the password; records older than 90 days are dropped.
 - The **Logs** tab (between "Proxy" and "Settings") shows the console log across the whole page, the last 300 lines with auto-refresh; export as txt, json or csv, for everything stored or since the last bot start. The file `data/console.log` keeps up to 2000 lines for 30 days.
 - The version block at the top right of **Settings**: "Show changes" expands the latest commits (needs a git installation), "Check for update" runs the usual check.
+
+Restart messages in the console log:
+
+| Message | What happened |
+|---|---|
+| `restarting` → `restarted` | the bot is restarting (from the panel, after a settings or proxy change) |
+| `network reconnect, restarting` → `restarted` | restart caused by network problems |
+| `reconnecting` → `reconnected` | the active proxy lost connection, the bot connects again |
+| `proxy switched` | the bot moved to another proxy without losing connection |
+| `reconnected (session resumed)` | Discord resumed the session after a short drop |
+
+A `[Tracker]` line is written once after about 10 seconds of quiet for a user, for example "3 images in 1 channel".
+
+</details>
 
 ---
 
@@ -251,7 +335,12 @@ All settings except the manual `/mrbeast` are also available in the web panel.
 
 <h2 align="center">Data storage</h2>
 
-Everything lives in the `data/` folder (excluded from git):
+Everything is stored in the `data/` folder (it never reaches git). The token, logs, images and the proxy list are encrypted (Fernet).
+
+<details>
+<summary><b>Files and what is protected</b></summary>
+
+<br>
 
 | File | Contents |
 |---|---|
@@ -264,6 +353,8 @@ Everything lives in the `data/` folder (excluded from git):
 | `logs.json`, `images/` | logs (kept up to 30 days, max 300) and the image cache, both encrypted |
 
 The token, logs and images are encrypted (Fernet) and the key sits in a separate file next to them, so the bot can start by itself after a restart. This protects against leaking a single file by accident, but not against someone who gets the whole `data/` folder. Do not publish it or share it. Details: [privacy policy](PRIVACY.md).
+
+</details>
 
 ---
 
