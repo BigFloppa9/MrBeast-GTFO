@@ -119,7 +119,16 @@ const I18N = {
     "proxy.timer_tip": "Time left until this proxy is removed automatically if it does not come back online.",
     "proxy.show": "Show servers",
     "proxy.hide": "Hide servers",
-    "proxy.secret": "Hover (or tap) to reveal the link",
+    "proxy.secret": "Right-click to copy the link",
+    "proxy.copied": "Link copied.",
+    "proxy.copy_failed": "Could not copy the link.",
+    "proxy.use_tip": "Click to switch to this proxy",
+    "proxy.switched": "Switched to {name}.",
+    "proxy.use_saved": "Saved: this proxy will be used when the bot connects.",
+    "err.proxy_down": "This proxy does not respond right now.",
+    "update.show_short": "Changes",
+    "update.hide_short": "Hide",
+    "update.check_short": "Check",
     "proxy.empty_sub": "No servers from this subscription.",
     "proxy.hint": "Needed if Discord is blocked by your provider. Paste proxy links (socks5, http, vless, vmess, trojan, ss), a JSON config or a subscription link (https://…), one per line. Up to {max} entries.",
     "proxy.placeholder": "socks5://127.0.0.1:2080\nvless://uuid@host:443?type=tcp&security=reality&…\nhttps://example.com/sub/…\n{ JSON config }",
@@ -362,11 +371,11 @@ const I18N = {
     "forgot.copy": "Copy command",
     "forgot.copied": "Copied.",
     "console.title": "Console log",
-    "console.hint": "The last {n} lines. Older lines are overwritten. You can export the log and share it when something goes wrong.",
+    "console.hint": "The last {n} lines. Older lines are overwritten. You can export the log, for example to attach it to a bug report.",
     "console.empty": "No lines yet.",
     "console.refresh": "Refresh",
     "console.export": "Export",
-    "console.scope_all": "Everything stored",
+    "console.scope_all": "All",
     "console.scope_session": "Since the last bot start",
     "data.title": "Transfer settings",
     "data.hint": "Saves server settings, punishment presets, reasons, detection counters and proxies to a file. User IDs and proxy data are encrypted with a password you set on export. Offenders and logs are not included. Anything older than 90 days is dropped on import.",
@@ -517,7 +526,16 @@ const I18N = {
     "proxy.timer_tip": "Время до автоматического удаления этого прокси, если он не выйдет в сеть.",
     "proxy.show": "Показать серверы",
     "proxy.hide": "Скрыть серверы",
-    "proxy.secret": "Наведите курсор (или коснитесь), чтобы увидеть ссылку",
+    "proxy.secret": "Нажмите ПКМ, чтобы скопировать ссылку",
+    "proxy.copied": "Ссылка скопирована.",
+    "proxy.copy_failed": "Не удалось скопировать ссылку.",
+    "proxy.use_tip": "Нажмите, чтобы переключиться на этот прокси",
+    "proxy.switched": "Переключено на {name}.",
+    "proxy.use_saved": "Сохранено: этот прокси будет использован при подключении бота.",
+    "err.proxy_down": "Этот прокси сейчас не отвечает.",
+    "update.show_short": "Изменения",
+    "update.hide_short": "Скрыть",
+    "update.check_short": "Проверить",
     "proxy.empty_sub": "Серверов этой подписки нет.",
     "proxy.hint": "Нужно, если Discord заблокирован у провайдера. Вставьте ссылки на прокси (socks5, http, vless, vmess, trojan, ss), JSON-конфиг или ссылку на подписку (https://…), по одной в строке. До {max} записей.",
     "proxy.placeholder": "socks5://127.0.0.1:2080\nvless://uuid@host:443?type=tcp&security=reality&…\nhttps://example.com/sub/…\n{ JSON-конфиг }",
@@ -760,11 +778,11 @@ const I18N = {
     "forgot.copy": "Скопировать команду",
     "forgot.copied": "Скопировано.",
     "console.title": "Лог консоли",
-    "console.hint": "Последние {n} строк. Более старые затираются. Лог можно экспортировать и прислать, если что-то пошло не так.",
+    "console.hint": "Последние {n} строк. Более старые затираются. Лог можно экспортировать, например, чтобы приложить к сообщению об ошибке.",
     "console.empty": "Пока нет строк.",
     "console.refresh": "Обновить",
     "console.export": "Экспорт",
-    "console.scope_all": "Всё сохранённое",
+    "console.scope_all": "Всё",
     "console.scope_session": "С последнего запуска бота",
     "data.title": "Перенос настроек",
     "data.hint": "Сохраняет в файл настройки серверов, пресеты наказаний, причины, счётчики обнаружений и прокси. ID пользователей и данные прокси шифруются паролем, который вы задаёте при экспорте. Нарушители и логи не включаются. Всё старше 90 дней отбрасывается при импорте.",
@@ -925,9 +943,19 @@ async function api(method, path, body) {
 
 function pad(n) { return String(n).padStart(2, "0"); }
 
+const CLOCK12 = (() => {
+  try { return new Intl.DateTimeFormat(undefined, { hour: "numeric" }).resolvedOptions().hour12 === true; } catch (e) { return false; }
+})();
+
+function clock(d) {
+  const tail = ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+  if (!CLOCK12) return pad(d.getHours()) + tail;
+  return (d.getHours() % 12 || 12) + tail + " " + (d.getHours() < 12 ? "AM" : "PM");
+}
+
 function formatStamp(ts) {
   const d = new Date(ts * 1000);
-  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${clock(d)}`;
 }
 
 function dayKey(ts) {
@@ -1790,11 +1818,32 @@ function renderModerator() {
 function updateSection() {
   const result = h("div", {});
   const changes = h("div", { class: "changes-box", hidden: true });
+  const closeButton = h("button", { class: "pop-close", type: "button", title: "×", onclick: () => closePop() }, "×");
+  const pop = h("div", { class: "update-pop", hidden: true }, closeButton, changes, result);
   const password = h("input", { type: "password", autocomplete: "current-password" });
   const version = h("b", {}, "…");
-  const checkButton = h("button", { class: "btn secondary small", type: "button", onclick: () => check() }, tr("update.check"));
+  const checkButton = h("button", { class: "btn secondary small", type: "button", onclick: () => check() },
+    h("span", { class: "long" }, tr("update.check")), h("span", { class: "short" }, tr("update.check_short")));
+  const toggleLabel = h("span", {});
+  const toggleButton = h("button", { class: "btn secondary small", type: "button", onclick: () => toggle() }, icon("chevron"), toggleLabel);
   let loaded = false;
-  const toggleButton = h("button", { class: "btn secondary small", type: "button", onclick: () => toggle() }, icon("chevron"), h("span", {}, tr("update.show")));
+
+  function paintToggle(opening) {
+    toggleLabel.replaceChildren(
+      h("span", { class: "long" }, tr(opening ? "update.hide" : "update.show")),
+      h("span", { class: "short" }, tr(opening ? "update.hide_short" : "update.show_short")));
+  }
+  paintToggle(false);
+
+  function syncPop() { pop.hidden = changes.hidden && !result.hasChildNodes(); }
+  function show(...nodes) { result.replaceChildren(...nodes); syncPop(); }
+  function closePop() {
+    changes.hidden = true;
+    toggleButton.classList.remove("open");
+    paintToggle(false);
+    result.replaceChildren();
+    syncPop();
+  }
 
   api("GET", "/api/update/info").then(info => { if (info.ok) version.textContent = "v" + info.version; });
 
@@ -1802,7 +1851,8 @@ function updateSection() {
     const opening = changes.hidden;
     changes.hidden = !opening;
     toggleButton.classList.toggle("open", opening);
-    toggleButton.lastChild.textContent = tr(opening ? "update.hide" : "update.show");
+    paintToggle(opening);
+    syncPop();
     if (!opening || loaded) return;
     changes.replaceChildren(h("p", { class: "meta" }, "…"));
     const info = await api("GET", "/api/update/info");
@@ -1810,15 +1860,15 @@ function updateSection() {
     loaded = true;
     changes.replaceChildren(...info.commits.map(commit => h("div", { class: "commit" },
       h("div", { class: "commit-head" }, h("b", {}, commit.title), h("span", { class: "meta" }, commit.date + " · " + commit.hash)),
-      commit.body ? h("ul", {}, commit.body.split("\n").filter(Boolean).map(line => h("li", {}, line.replace(/^[-–•]\s*/, "")))) : null)));
+      commit.body ? h("pre", { class: "commit-body" }, commit.body) : null)));
   }
 
   async function check() {
     checkButton.disabled = true;
-    result.replaceChildren(h("p", { class: "meta" }, tr("update.checking")));
+    show(h("p", { class: "meta" }, tr("update.checking")));
     const res = await api("GET", "/api/update/check");
     checkButton.disabled = false;
-    if (!res.ok) { result.replaceChildren(h("div", { class: "msg error" }, errorText(res))); return; }
+    if (!res.ok) { show(h("div", { class: "msg error" }, errorText(res))); return; }
     const nodes = [];
     if (!res.behind) {
       nodes.push(h("div", { class: "msg ok" }, tr("update.latest")));
@@ -1830,7 +1880,7 @@ function updateSection() {
       nodes.push(field(tr("update.password"), password));
       nodes.push(h("div", { class: "actions" }, h("button", { class: "btn", type: "button", onclick: apply }, tr("update.apply"))));
     }
-    result.replaceChildren(...nodes);
+    show(...nodes);
   }
 
   async function apply() {
@@ -1838,14 +1888,14 @@ function updateSection() {
     if (!res.ok) { toast(errorText(res), "error"); return; }
     stopTimers();
     const label = h("p", { class: "meta" }, tr("update.running"));
-    result.replaceChildren(label);
+    show(label);
     const id = setInterval(async () => {
       if (!me.authed) { clearInterval(id); return; }
       const status = await api("GET", "/api/update/status");
       if (!status.ok) return;
       if (status.error) {
         clearInterval(id);
-        result.replaceChildren(
+        show(
           h("div", { class: "msg error" }, tr("update.failed") + " (" + status.error + ")"),
           status.detail ? h("pre", { class: "detail" }, status.detail) : null,
           h("div", { class: "actions" }, h("button", { class: "btn secondary", type: "button", onclick: renderDashboard }, tr("update.ok")))
@@ -1857,9 +1907,10 @@ function updateSection() {
   }
 
   return h("div", { class: "update-card" },
-    h("div", { class: "update-top" }, h("div", { class: "update-version" }, h("span", { class: "meta" }, tr("update.label")), version),
-      h("div", { class: "update-buttons" }, toggleButton, checkButton)),
-    changes, result);
+    h("div", { class: "update-top" },
+      h("div", { class: "update-version" }, h("span", { class: "meta" }, tr("update.label")), version),
+      toggleButton, checkButton),
+    pop);
 }
 
 function privacySection() {
@@ -1915,12 +1966,107 @@ const deadlines = new Map();
 let proxyTick = null;
 let popBound = false;
 
+const spoilerItems = new Map();
+let spoilerRaf = 0;
+let spoilerLast = 0;
+
 function bindPops() {
   if (popBound) return;
   popBound = true;
   document.addEventListener("pointerdown", (event) => {
     document.querySelectorAll(".touch-pop.shown").forEach(el => { if (!el.contains(event.target)) el.classList.remove("shown"); });
+    for (const [el, item] of spoilerItems) if (item.shown && !el.contains(event.target)) item.set(false);
   });
+}
+
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; }
+  } catch (e) {}
+  const area = h("textarea", { style: "position:fixed;top:0;left:0;opacity:0" });
+  area.value = text;
+  document.body.append(area);
+  area.select();
+  let done = false;
+  try { done = document.execCommand("copy"); } catch (e) {}
+  area.remove();
+  return done;
+}
+
+function spoilerSeed(item) {
+  const ratio = window.devicePixelRatio || 1;
+  item.w = item.el.clientWidth;
+  item.h = item.el.clientHeight;
+  item.canvas.width = Math.max(1, Math.round(item.w * ratio));
+  item.canvas.height = Math.max(1, Math.round(item.h * ratio));
+  item.ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  const count = Math.min(700, Math.round(item.w * item.h / 12));
+  item.particles = Array.from({ length: count }, () => spoilerParticle(item, true));
+}
+
+function spoilerParticle(item, scatter) {
+  const life = 24 + Math.random() * 56;
+  return {
+    x: Math.random() * item.w, y: Math.random() * item.h,
+    vx: (Math.random() - .5) * .7, vy: (Math.random() - .5) * .7,
+    s: .9 + Math.random() * .8, life, age: scatter ? Math.random() * life : 0
+  };
+}
+
+function spoilerFrame(now) {
+  spoilerRaf = 0;
+  const step = now - spoilerLast >= 33;
+  let running = false;
+  for (const [el, item] of spoilerItems) {
+    if (!el.isConnected) { spoilerItems.delete(el); continue; }
+    if (item.shown || !item.ctx) continue;
+    running = true;
+    if (!step) continue;
+    if (item.w !== el.clientWidth || item.h !== el.clientHeight) spoilerSeed(item);
+    const ctx = item.ctx;
+    ctx.clearRect(0, 0, item.w, item.h);
+    ctx.fillStyle = "#fff";
+    for (let i = 0; i < item.particles.length; i++) {
+      let p = item.particles[i];
+      p.x += p.vx; p.y += p.vy; p.age += 1;
+      if (p.age >= p.life || p.x < 0 || p.x > item.w || p.y < 0 || p.y > item.h) p = item.particles[i] = spoilerParticle(item, false);
+      ctx.globalAlpha = .2 + .8 * Math.sin(Math.PI * p.age / p.life);
+      ctx.fillRect(p.x, p.y, p.s, p.s);
+    }
+  }
+  if (step) spoilerLast = now;
+  if (running) spoilerRaf = requestAnimationFrame(spoilerFrame);
+}
+
+function spoilerStart() {
+  if (!spoilerRaf && typeof requestAnimationFrame === "function") spoilerRaf = requestAnimationFrame(spoilerFrame);
+}
+
+function makeSpoiler(text, key) {
+  const canvas = h("canvas", { class: "spoiler-dust" });
+  const el = h("span", { class: "spoiler", tabindex: "0", role: "button", title: tr("proxy.secret") }, h("span", { class: "spoiler-text" }, text), canvas);
+  let ctx = null;
+  try { ctx = canvas.getContext("2d"); } catch (e) {}
+  const item = { el, canvas, ctx, particles: [], w: 0, h: 0, shown: false, set: null };
+  item.set = (value) => {
+    item.shown = value;
+    el.classList.toggle("shown", value);
+    if (value) shownSecrets.add(key);
+    else { shownSecrets.delete(key); spoilerStart(); }
+  };
+  spoilerItems.set(el, item);
+  bindPops();
+  el.addEventListener("click", (event) => { event.stopPropagation(); item.set(!item.shown); });
+  el.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") { event.preventDefault(); item.set(!item.shown); }
+  });
+  el.addEventListener("contextmenu", async (event) => {
+    event.preventDefault();
+    const done = await copyText(text);
+    toast(tr(done ? "proxy.copied" : "proxy.copy_failed"), done ? "ok" : "error");
+  });
+  item.set(shownSecrets.has(key));
+  return el;
 }
 
 function touchPop(el, key) {
@@ -1996,25 +2142,34 @@ function proxySection() {
     }, icon("speed"));
   }
 
+  async function useProxy(row) {
+    if (row.active) return;
+    const res = await api("POST", "/api/proxy/" + encodeURIComponent(row.id) + "/use", {});
+    if (!res.ok) { toast(errorText(res), "error"); return; }
+    paint(res);
+    if (res.result === "switched") toast(tr("proxy.switched", { name: row.label }), "ok");
+    else if (res.result === "saved") toast(tr("proxy.use_saved"), "ok");
+  }
+
   function serverRow(row, index) {
     return h("div", { class: "proxy-row" + (row.active ? " active" : "") },
       h("span", { class: "proxy-num" }, String(index + 1)),
       h("span", { class: "dot " + pingDot(row) }),
       h("span", { class: "badge" }, row.type),
-      h("div", { class: "proxy-name" },
+      h("div", { class: "proxy-name", title: row.active ? "" : tr("proxy.use_tip"), onclick: () => useProxy(row) },
         h("div", { class: "proxy-label" }, row.label),
         row.desc ? h("div", { class: "proxy-desc" }, row.desc) : null),
       stateCell(row),
-      pingButton(row.id, tr("proxy.ping"), () => pingOne(row.id)),
-      h("button", { class: "btn secondary small icon-btn", type: "button", title: tr("proxy.edit"), onclick: () => openProxyDialog(row.id, (res) => { paint(res); }) }, icon("edit")),
-      h("button", { class: "btn secondary small", type: "button", title: tr("proxy.remove"), onclick: () => remove(row.id) }, "×"));
+      h("div", { class: "proxy-actions" },
+        pingButton(row.id, tr("proxy.ping"), () => pingOne(row.id)),
+        h("button", { class: "btn secondary small icon-btn", type: "button", title: tr("proxy.edit"), onclick: () => openProxyDialog(row.id, (res) => { paint(res); }) }, icon("edit")),
+        h("button", { class: "btn secondary small", type: "button", title: tr("proxy.remove"), onclick: () => remove(row.id) }, "×")));
   }
 
   function subCard(sub, rows) {
     const open = openSubs.has(sub.id);
     const flip = () => { if (open) openSubs.delete(sub.id); else openSubs.add(sub.id); paint(last); };
-    const secret = touchPop(h("span", { class: "spoiler", title: tr("proxy.secret") }, sub.url), "s:" + sub.id);
-    secret.addEventListener("click", (event) => event.stopPropagation());
+    const secret = makeSpoiler(sub.url, "s:" + sub.id);
     return h("div", { class: "sub-card" + (open ? " open" : "") },
       h("div", { class: "sub-head" },
         h("button", { class: "sub-toggle", type: "button", title: tr(open ? "proxy.hide" : "proxy.show"), "aria-expanded": open ? "true" : "false", onclick: flip }, icon("chevron")),
@@ -2155,7 +2310,7 @@ function parseMinutes(text) {
 
 function consoleLine(item) {
   const d = new Date(item.ts * 1000);
-  return pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds()) + " " + item.level + " " + item.msg;
+  return clock(d) + " " + item.level + " " + item.msg;
 }
 
 let consoleCache = [];
@@ -2325,6 +2480,8 @@ function serverPicker(guilds, selectedId, onPick) {
     open = true;
     pop.hidden = false;
     root.classList.add("open");
+    const host = root.closest(".section");
+    if (host) host.classList.add("raised");
     input.value = "";
     refresh();
     document.addEventListener("mousedown", onDocument);
@@ -2334,6 +2491,8 @@ function serverPicker(guilds, selectedId, onPick) {
     open = false;
     pop.hidden = true;
     root.classList.remove("open");
+    const host = root.closest(".section");
+    if (host) host.classList.remove("raised");
     document.removeEventListener("mousedown", onDocument);
   }
 
@@ -2423,8 +2582,7 @@ function renderConsoleTab(content) {
   consoleRefresh = refresh;
   content.replaceChildren(h("div", { class: "console-page" },
     h("div", { class: "console-bar" }, scope, format,
-      h("button", { class: "btn", type: "button", onclick: () => { window.location.href = "/api/console/export?format=" + format.value + "&scope=" + scope.value; } }, tr("console.export")),
-      h("button", { class: "btn secondary", type: "button", onclick: refresh }, tr("console.refresh"))),
+      h("button", { class: "btn", type: "button", onclick: () => { window.location.href = "/api/console/export?format=" + format.value + "&scope=" + scope.value; } }, tr("console.export"))),
     h("p", { class: "meta" }, tr("console.hint", { n: 300 })),
     box));
   refresh();
@@ -2655,11 +2813,11 @@ function renderSettingsTab(content) {
     h("div", { class: "panel" },
       h("div", { class: "section" }, h("h3", {}, tr("settings.languages")),
         h("div", { class: "row" }, field(tr("settings.panel_lang"), panelLang), field(tr("settings.bot_lang"), botLang))),
-      securitySection(),
       moderatorSection(),
       h("div", { class: "section" }, h("h3", {}, tr("settings.token")), h("p", { class: "meta" }, tr("settings.token_hint")), tokenForm),
       dataSection(),
-      privacySection()
+      privacySection(),
+      securitySection()
     ),
     h("aside", { class: "settings-side" }, updateSection())
   ));
@@ -2680,8 +2838,8 @@ const KOS_REMOTE = "https://sun1-13.userapi.com/s/v1/ig2/6ik4I-I0a9zOuDvPmcE45LY
 async function loadKosBackground() {
   let source = KOS_REMOTE;
   try {
-    const res = await fetch("/api/kos-bg", { method: "HEAD", cache: "no-store" });
-    if (res.ok) source = "/api/kos-bg";
+    const res = await fetch("/api/kos-bg?v=2", { method: "HEAD", cache: "no-store" });
+    if (res.ok) source = "/api/kos-bg?v=2";
   } catch (e) {}
   document.documentElement.style.setProperty("--kos-bg", 'url("' + source + '")');
 }

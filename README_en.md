@@ -161,35 +161,13 @@ Channels that regular users can't see (for example the log channel): the bot's r
 | **Offenders** | Latest records as Discord-style messages: offender display name, username and ID, trigger text, channel link, images (identical ones stored once), action. Updates automatically |
 | **Status** | Ping, uptime, control buttons, panel addresses on the network, the last 20 console lines. The bot's state is a coloured capsule under its name on the left (green: online, orange: connecting, red: paused or stopped) |
 | **Servers** | The server list and per server: punishment preset, steps, reasons, detection reset period, log channel, auto-detection thresholds |
-| **Proxy** | The add form is at the top. Single proxies are a plain list, subscriptions expand with an arrow (the link is hidden by a "spoiler" until hover or tap). Every server shows ping in ms, the provider's description, a manual ping button (speedometer icon, for a subscription it checks all its servers) and an editor. A server that is down shows a countdown to automatic removal |
+| **Proxy** | The add form is at the top. Single proxies are a plain list, subscriptions expand with an arrow (the link is hidden by a "spoiler": a click shows or hides it, right-click copies it). Every server shows ping in ms, the provider's description, a manual ping button (speedometer icon, for a subscription it checks all its servers) and an editor. A server that is down shows a countdown to automatic removal |
 | **Logs** | Console log across the whole page with export |
 | **Settings** | Languages, administrator account link, token replacement, updates, removal of a user's data |
 
 Details for each section expand in the blocks below.
 
 In the panel logs, offender fields, trigger text and channel names are cut to 69 characters so spam can't bloat the history. Videos are not saved. Records are kept for at most 30 days (and at most 300 records).
-
-<details>
-<summary><b>Account link and password reset</b></summary>
-
-<br>
-
-The link is required to recover the password.
-
-1. In the panel open **Settings → Moderator accounts → Generate code**. Up to 10 accounts can be linked by repeating the steps; accounts are unlinked in the same place.
-2. Send the bot the command `/reg CODE` in **DIRECT** messages. The bot checks that you are an administrator (or the owner) of a server it works on and links your account by ID.
-
-If the password is lost:
-
-1. Click **"Forgot password?"** on the sign-in page.
-2. Send the bot the command `/log` (no code) in **DIRECT** messages. The bot replies with a code to the linked account only.
-3. Enter the code in the browser, then enter the new password twice.
-
-Without a linked account the password can be recovered with **security questions**: in **Settings → Password recovery** choose up to 3 questions (ready-made or your own); answers are written in Latin letters without spaces (use `_`) and stored only as hashes. A hint shown under the password field after two wrong attempts is set there too. On the sign-in page the password field is cleared after a wrong password.
-
-If neither a linked account nor questions exist, the recovery page shows the command that reinstalls the bot for your device (Termux or other). Reinstalling deletes all bot data.
-
-</details>
 
 <details>
 <summary><b>Bot control (pause, restart, stop)</b></summary>
@@ -224,6 +202,7 @@ Accepted (one link per line, or one or several configs in a row):
 - If no entry works, the bot connects **directly**.
 - In the background, every 10 minutes all entries (including unused ones) are checked. If the bot is connected directly and some entry comes back, it switches to it by itself.
 - An entry that does not respond for a total of one day is removed from the list automatically. The time is counted only while the device has internet: short network drops and phone sleep are not counted. Such an entry shows a red dot and a countdown to removal.
+- Adding or updating subscriptions does not restart the bot: new servers are checked in the background, and the bot switches only when the active proxy becomes unstable. Clicking a server's name in the list switches the bot to it without a restart (if the server does not respond, no switch happens).
 
 </details>
 
@@ -313,7 +292,29 @@ Restart messages in the console log:
 | `proxy switched` | the bot moved to another proxy without losing connection |
 | `reconnected (session resumed)` | Discord resumed the session after a short drop |
 
-A `[Tracker]` line is written once after about 10 seconds of quiet for a user, for example "3 images in 1 channel".
+A `[Tracker]` line is written after about 10 seconds of quiet for a user and counts images per message: one message with 5 images gives "5 images in 1 channel", while the same message posted to several channels in a row is merged into one line such as "4 images in 4 channels".
+
+</details>
+
+<details>
+<summary><b>Account link and password reset</b></summary>
+
+<br>
+
+The link is required to recover the password.
+
+1. In the panel open **Settings → Moderator accounts → Generate code**. Up to 10 accounts can be linked by repeating the steps; accounts are unlinked in the same place.
+2. Send the bot the command `/reg CODE` in **DIRECT** messages. The bot checks that you are an administrator (or the owner) of a server it works on and links your account by ID.
+
+If the password is lost:
+
+1. Click **"Forgot password?"** on the sign-in page.
+2. Send the bot the command `/log` (no code) in **DIRECT** messages. The bot replies with a code to the linked account only.
+3. Enter the code in the browser, then enter the new password twice.
+
+Without a linked account the password can be recovered with **security questions**: in **Settings → Password recovery** choose up to 3 questions (ready-made or your own); answers are written in Latin letters without spaces (use `_`) and stored only as hashes. A hint shown under the password field after two wrong attempts is set there too. On the sign-in page the password field is cleared after a wrong password.
+
+If neither a linked account nor questions exist, the recovery page shows the command that reinstalls the bot for your device (Termux or other). Reinstalling deletes all bot data.
 
 </details>
 

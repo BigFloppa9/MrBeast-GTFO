@@ -4,7 +4,7 @@ import time
 import aiohttp
 
 from .config import DATA_DIR, write_bytes_atomic
-from .logstore import MAX_IMAGE_BYTES, detect_extension
+from .logstore import MAX_IMAGE_BYTES, detect_extension, image_complete
 from .state import state
 from .utils import read_capped
 
@@ -17,13 +17,25 @@ RETRY_AFTER = 60
 
 lock = asyncio.Lock()
 failed_at = 0.0
+checked = False
 
 
 def cached():
+    global checked
     for ext in CONTENT_TYPES:
         path = DATA_DIR / f"kos-bg.{ext}"
-        if path.is_file():
+        if not path.is_file():
+            continue
+        if checked:
             return path
+        try:
+            good = image_complete(path.read_bytes())
+        except OSError:
+            good = False
+        if good:
+            checked = True
+            return path
+        path.unlink(missing_ok=True)
     return None
 
 
@@ -47,7 +59,7 @@ async def ensure_background():
             data = await state.proxies.with_routes(fetch)
         except Exception:
             data = b""
-        ext = detect_extension(data) if 0 < len(data) <= MAX_IMAGE_BYTES else None
+        ext = detect_extension(data) if 0 < len(data) <= MAX_IMAGE_BYTES and image_complete(data) else None
         if not ext:
             failed_at = time.monotonic()
             return None

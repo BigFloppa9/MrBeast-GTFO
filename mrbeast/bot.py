@@ -360,17 +360,25 @@ class Guard(commands.Cog):
         if item is None:
             return
         item["handle"].cancel()
-        images, channels = item["images"], len(item["channels"])
-        logger.info(f"[Tracker] {item['author']}: {images} image{'s' if images != 1 else ''} in {channels} channel{'s' if channels != 1 else ''}")
+        groups: list[dict] = []
+        for channel, images in item["events"]:
+            if not groups or channel in groups[-1]["channels"]:
+                groups.append({"images": 0, "channels": set()})
+            groups[-1]["images"] += images
+            groups[-1]["channels"].add(channel)
+        for group in groups:
+            images, channels = group["images"], len(group["channels"])
+            logger.info(f"[Tracker] {item['author']}: {images} image{'s' if images != 1 else ''} in {channels} channel{'s' if channels != 1 else ''}")
 
-    def track(self, key: tuple[int, int], author, images: int, channels: set):
+    def track(self, key: tuple[int, int], author, channel: int, images: int):
         now = time.monotonic()
         item = self.track_pending.get(key)
         if item is None:
-            item = self.track_pending[key] = {"since": now, "handle": None}
+            item = self.track_pending[key] = {"since": now, "handle": None, "events": []}
         else:
             item["handle"].cancel()
-        item["author"], item["images"], item["channels"] = str(author), images, set(channels)
+        item["author"] = str(author)
+        item["events"].append((channel, images))
         delay = max(0.0, min(TRACK_QUIET, TRACK_MAX - (now - item["since"])))
         item["handle"] = asyncio.get_running_loop().call_later(delay, self.flush_tracker, key)
 
@@ -454,7 +462,9 @@ class Guard(commands.Cog):
         tracker = self.image_tracker[gid][uid]
 
         unique_chs = {e["ch"] for e in tracker}
-        self.track((gid, uid), message.author, len(tracker), unique_chs)
+        shown = sum(1 for a in message.attachments if a.content_type and a.content_type.startswith("image/"))
+        shown += sum(1 for e in message.embeds if e.image or e.thumbnail)
+        self.track((gid, uid), message.author, message.channel.id, max(1, shown))
 
         if len(tracker) >= s["auto_min_images"] and len(unique_chs) >= s["auto_min_channels"]:
             self.flush_tracker((gid, uid))

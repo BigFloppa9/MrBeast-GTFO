@@ -966,6 +966,9 @@ class ProxyPool:
         self.fetcher = Xray("fetch")
         self.probe_lock = asyncio.Lock()
         self.spare_lock = asyncio.Lock()
+        self.switch_lock = asyncio.Lock()
+        self.preferred = ""
+        self.dropped = False
         self.dirty = False
         self.last_full = 0.0
         self.penalty: dict[str, float] = {}
@@ -1015,7 +1018,7 @@ class ProxyPool:
         self.entries = kept
         self.status.pop(entry_id, None)
         if self.active == entry_id:
-            self.active, self.url = "", None
+            self.active, self.url, self.dropped = "", None, True
         self.save()
         return True
 
@@ -1030,7 +1033,7 @@ class ProxyPool:
                 self.entries[index] = fresh
                 self.status.pop(entry_id, None)
                 if self.active == entry_id:
-                    self.active, self.url = "", None
+                    self.active, self.url, self.dropped = "", None, True
                 self.save()
                 return True
         return False
@@ -1066,7 +1069,7 @@ class ProxyPool:
         self.subs = kept
         self.entries = [e for e in self.entries if e.get("sub") != sub_id]
         if self.active and not any(e["id"] == self.active for e in self.entries):
-            self.active, self.url = "", None
+            self.active, self.url, self.dropped = "", None, True
         self.save()
         return True
 
@@ -1344,6 +1347,7 @@ class ProxyPool:
             (e for e in self.entries if results.get(e["id"], (False,))[0]),
             key=lambda e: (self.penalty.get(e["id"], 0) > now, results[e["id"]][1]),
         )
+        ranked.sort(key=lambda e: e["id"] != self.preferred)
         for entry in ranked:
             if stop.is_set():
                 return None
@@ -1352,7 +1356,7 @@ class ProxyPool:
                 ok, ms, error = await probe(url)
                 self.record(entry["id"], ok, ms, error)
                 if ok:
-                    self.active, self.url, self.last_full = entry["id"], url, time.monotonic()
+                    self.active, self.url, self.last_full, self.dropped = entry["id"], url, time.monotonic(), False
                     self.flush()
                     logger.info(f"Using proxy {split_label(entry['label'])[0]} ({ms} ms)")
                     return url
@@ -1361,10 +1365,52 @@ class ProxyPool:
         self.flush()
         return None
 
+    async def activate(self, entry_id: str) -> str | None:
+        entry = next((e for e in self.entries if e["id"] == entry_id), None)
+        if entry is None:
+            return None
+        async with self.switch_lock:
+            results = await self.probe_all(ids={entry_id})
+            if not results.get(entry_id, (False,))[0]:
+                return None
+            previous = next((e for e in self.entries if e["id"] == self.active), None)
+            url = await self.open_entry(entry)
+            if url:
+                ok, ms, error = await probe(url)
+                self.record(entry_id, ok, ms, error)
+                if ok:
+                    self.active, self.url, self.last_full, self.dropped = entry_id, url, time.monotonic(), False
+                    self.flush()
+                    return url
+            if previous is not None:
+                self.url = await self.open_entry(previous)
+                if self.url is None:
+                    self.active = ""
+            return None
+
     async def watch(self):
         misses = 0
+        seen = self.url
         while True:
-            await asyncio.sleep(WATCH_INTERVAL)
+            await asyncio.sleep(WATCH_INTERVAL if self.url or self.dropped else RECOVER_INTERVAL)
+            if self.url != seen:
+                seen, misses = self.url, 0
+            if not self.url:
+                if self.dropped:
+                    self.dropped = False
+                    self.watch_reason = "lost"
+                    return
+                if not self.entries:
+                    continue
+                try:
+                    results = await self.probe_all()
+                except Exception as e:
+                    logger.error(f"Background check failed: {e!r}")
+                    continue
+                if any(r[0] for r in results.values()):
+                    self.watch_reason = "better"
+                    return
+                continue
             active = next((e for e in self.entries if e["id"] == self.active), None)
             if active is None:
                 self.watch_reason = "lost"

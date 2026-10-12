@@ -75,7 +75,7 @@ class BotRunner:
             bot = GuardBot(proxy=url)
             self.bot = bot
             run = asyncio.create_task(bot.start(token))
-            watch = asyncio.create_task(pool.watch() if url else pool.wait_recovery()) if (url or pool.entries) else None
+            watch = asyncio.create_task(pool.watch()) if (url or pool.entries) else None
             try:
                 await asyncio.wait({t for t in (run, watch) if t}, return_when=asyncio.FIRST_COMPLETED)
             finally:
@@ -114,6 +114,31 @@ class BotRunner:
         state.proxy_url = None
         self.running = False
         console.fold_cancel()
+
+    async def use_proxy(self, entry_id: str, force: bool = False) -> str:
+        pool = state.proxies
+        if not any(e["id"] == entry_id for e in pool.entries):
+            return "proxy_missing"
+        pool.preferred = entry_id
+        bot = self.bot
+        if not self.running or bot is None or bot.is_closed():
+            return "saved"
+        if pool.active == entry_id and not force:
+            return "active"
+        url = await pool.activate(entry_id)
+        if not url:
+            return "proxy_down"
+        state.proxy_url = url
+        self.direct_fallback = False
+        bot.http.proxy = url
+        ws = getattr(bot, "ws", None)
+        if ws is not None:
+            try:
+                await ws.close(code=4000)
+            except Exception:
+                pass
+        console.note("proxy switched")
+        return "switched"
 
     async def pause(self, stop_event: asyncio.Event, seconds: float) -> bool:
         try:
@@ -176,7 +201,7 @@ class BotRunner:
             error = ""
         data = {"status": status, "error": error, "user": None, "latency": None, "uptime": None, "guilds": []}
         if online and bot.user:
-            data["user"] = {"id": str(bot.user.id), "name": bot.user.name, "avatar": "/api/img/bot"}
+            data["user"] = {"id": str(bot.user.id), "name": bot.user.name, "avatar": "/api/img/bot?v=2"}
             latency = bot.latency
             data["latency"] = round(latency * 1000) if math.isfinite(latency) else None
             data["uptime"] = int(time.time() - bot.ready_at) if bot.ready_at else None
@@ -185,7 +210,7 @@ class BotRunner:
                     "id": str(g.id),
                     "name": g.name,
                     "members": g.member_count,
-                    "icon": f"/api/img/guild/{g.id}" if g.icon else None,
+                    "icon": f"/api/img/guild/{g.id}?v=2" if g.icon else None,
                 }
                 for g in sorted(bot.guilds, key=lambda g: g.name.lower())
             ]

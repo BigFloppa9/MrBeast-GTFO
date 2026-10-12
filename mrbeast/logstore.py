@@ -34,6 +34,18 @@ def cut(text, limit: int = FIELD_LIMIT) -> str:
     return text[: limit - 1] + "…"
 
 
+def image_complete(data: bytes) -> bool:
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return data[-8:-4] == b"IEND"
+    if data[:3] == b"\xff\xd8\xff":
+        return data.rstrip(b"\x00")[-2:] == b"\xff\xd9"
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return data.rstrip(b"\x00")[-1:] == b";"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return len(data) >= int.from_bytes(data[4:8], "little") + 8
+    return False
+
+
 def detect_extension(data: bytes) -> str | None:
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
         return "png"

@@ -547,9 +547,9 @@ async def api_data_import(request: web.Request):
             payload = await asyncio.to_thread(unseal, export["proxies"], passphrase)
         except ValueError as e:
             return fail(str(e))
+        before = entry_ids()
         proxies = state.proxies.import_data(payload)
-        if proxies:
-            await restart_bot()
+        schedule_probe(entry_ids() - before)
     return ok(guilds=len(cleaned), strikes=merged, proxies=proxies)
 
 
@@ -561,7 +561,22 @@ async def api_kos_bg(request: web.Request):
     path = await ensure_background()
     if path is None:
         raise web.HTTPNotFound()
-    return web.FileResponse(path, headers={"Content-Type": BG_TYPES[path.suffix[1:]], "Cache-Control": "public, max-age=86400"})
+    return web.FileResponse(path, headers={"Content-Type": BG_TYPES[path.suffix[1:]], "Cache-Control": "public, no-cache"})
+
+
+background: set = set()
+
+
+def schedule_probe(ids):
+    if not ids:
+        return
+    task = asyncio.create_task(state.proxies.probe_all(ids=set(ids)))
+    background.add(task)
+    task.add_done_callback(lambda t: (background.discard(t), t.cancelled() or t.exception()))
+
+
+def entry_ids() -> set:
+    return {e["id"] for e in state.proxies.entries}
 
 
 async def restart_bot():
@@ -576,7 +591,7 @@ async def api_img(request: web.Request):
     path = await cached_image(url) if url else None
     if path is None:
         raise web.HTTPNotFound()
-    return web.FileResponse(path, headers={"Content-Type": BG_TYPES[path.suffix[1:]], "Cache-Control": "private, max-age=3600"})
+    return web.FileResponse(path, headers={"Content-Type": BG_TYPES[path.suffix[1:]], "Cache-Control": "private, no-cache"})
 
 
 async def api_bot(request: web.Request):
@@ -614,8 +629,9 @@ async def api_sub_add(request: web.Request):
         return error
     entries, skipped = parsed
     known = next((x for x in state.proxies.subs if x["url"] == url), None)
+    before = entry_ids()
     _, added = state.proxies.merge_subscription(url, entries, known["id"] if known else None)
-    await restart_bot()
+    schedule_probe(entry_ids() - before)
     return ok(skipped=skipped, added=added, **state.proxies.view())
 
 
@@ -627,16 +643,15 @@ async def api_sub_update(request: web.Request):
     if error:
         return error
     entries, skipped = parsed
+    before = entry_ids()
     _, added = state.proxies.merge_subscription(sub["url"], entries, sub["id"])
-    if added:
-        await restart_bot()
+    schedule_probe(entry_ids() - before)
     return ok(skipped=skipped, added=added, **state.proxies.view())
 
 
 async def api_sub_delete(request: web.Request):
     if not state.proxies.remove_subscription(request.match_info["sid"]):
         return fail("proxy_missing", 404)
-    await restart_bot()
     return ok(**state.proxies.view())
 
 
@@ -647,6 +662,7 @@ async def api_proxy_get(request: web.Request):
 async def api_proxy_add(request: web.Request):
     data = await read_body(request)
     entries, errors, subs = parse_input(str(data.get("text") or ""))
+    before = entry_ids()
     added = state.proxies.add(entries) if entries else 0
     full = bool(entries) and not added
     loaded_subs = 0
@@ -665,8 +681,7 @@ async def api_proxy_add(request: web.Request):
             errors.append({"code": "sub_truncated", "n": n, "detail": str(len(loaded) - fresh)})
     if not added and not loaded_subs:
         return fail("proxy_limit" if full else "proxy_invalid", errors=errors)
-    if added:
-        await restart_bot()
+    schedule_probe(entry_ids() - before)
     return ok(added=added, errors=errors, **state.proxies.view())
 
 
@@ -696,7 +711,7 @@ async def api_proxy_form_add(request: web.Request):
         return fail(e.code)
     if not state.proxies.add([entry]):
         return fail("proxy_limit")
-    await restart_bot()
+    schedule_probe({entry["id"]})
     return ok(**state.proxies.view())
 
 
@@ -713,17 +728,30 @@ async def api_proxy_edit(request: web.Request):
         fresh = entry_from_fields(str(data.get("kind") or ""), data.get("fields"))
     except ParseError as e:
         return fail(e.code)
-    if not state.proxies.replace(request.match_info["pid"], fresh):
+    pid = request.match_info["pid"]
+    was_active = state.proxies.active == pid
+    if not state.proxies.replace(pid, fresh):
         return fail("proxy_missing", 404)
-    await restart_bot()
+    if was_active:
+        await runner.use_proxy(pid, force=True)
+    else:
+        schedule_probe({pid})
     return ok(**state.proxies.view())
 
 
 async def api_proxy_delete(request: web.Request):
     if not state.proxies.remove(request.match_info["pid"]):
         return fail("proxy_missing", 404)
-    await restart_bot()
     return ok(**state.proxies.view())
+
+
+async def api_proxy_use(request: web.Request):
+    result = await runner.use_proxy(request.match_info["pid"])
+    if result == "proxy_missing":
+        return fail("proxy_missing", 404)
+    if result == "proxy_down":
+        return fail("proxy_down")
+    return ok(result=result, **state.proxies.view())
 
 
 def create_app() -> web.Application:
@@ -763,6 +791,7 @@ def create_app() -> web.Application:
     app.router.add_post("/api/proxy/sub/{sid}/update", api_sub_update)
     app.router.add_post("/api/proxy/sub/{sid}/ping", api_sub_ping)
     app.router.add_post("/api/proxy/{pid}/ping", api_proxy_ping)
+    app.router.add_post("/api/proxy/{pid}/use", api_proxy_use)
     app.router.add_delete("/api/proxy/sub/{sid}", api_sub_delete)
     app.router.add_get("/api/proxy", api_proxy_get)
     app.router.add_post("/api/proxy", api_proxy_add)

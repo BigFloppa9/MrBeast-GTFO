@@ -5,7 +5,7 @@ import time
 import aiohttp
 
 from .config import CACHE_DIR, write_bytes_atomic
-from .logstore import detect_extension
+from .logstore import detect_extension, image_complete
 from .state import state
 from .utils import read_capped
 from .theme import CONTENT_TYPES
@@ -15,14 +15,25 @@ RETRY_AFTER = 60
 
 lock = asyncio.Lock()
 failed: dict[str, float] = {}
+verified: set[str] = set()
 
 
 async def cached_image(url: str):
     name = hashlib.sha1(url.encode()).hexdigest()
     for ext in CONTENT_TYPES:
         path = CACHE_DIR / f"{name}.{ext}"
-        if path.is_file():
+        if not path.is_file():
+            continue
+        if name in verified:
             return path
+        try:
+            good = image_complete(path.read_bytes())
+        except OSError:
+            good = False
+        if good:
+            verified.add(name)
+            return path
+        path.unlink(missing_ok=True)
     if time.monotonic() - failed.get(name, -RETRY_AFTER) < RETRY_AFTER:
         return None
     async with lock:
@@ -37,10 +48,11 @@ async def cached_image(url: str):
             data = await state.proxies.with_routes(fetch, direct_first=False, limit=2)
         except Exception:
             data = b""
-        ext = detect_extension(data) if 0 < len(data) <= MAX_BYTES else None
+        ext = detect_extension(data) if 0 < len(data) <= MAX_BYTES and image_complete(data) else None
         if not ext:
             failed[name] = time.monotonic()
             return None
         path = CACHE_DIR / f"{name}.{ext}"
         write_bytes_atomic(path, data)
+        verified.add(name)
         return path
