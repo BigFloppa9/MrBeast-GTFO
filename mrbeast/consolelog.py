@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import threading
 import time
 from collections import deque
@@ -17,6 +18,17 @@ FOLD_TEXT = {
     "network": ("network reconnect, restarting", "restarted"),
 }
 FOLD_ORDER = ("switch", "restart", "lost", "network")
+ACTION_RE = re.compile(r"^\[(AutoDetect|auto|manual)\]")
+FAILURE_NOTES = ("reconnecting", "network reconnect, restarting")
+CATEGORIES = ("all", "actions", "errors")
+
+
+def in_category(item: dict, category: str) -> bool:
+    if category == "actions":
+        return bool(ACTION_RE.match(item["msg"]))
+    if category == "errors":
+        return LEVELS.get(item["level"], 0) >= 30 or (item["name"] == "mrbeast.network" and item["msg"] in FAILURE_NOTES)
+    return True
 
 
 class ConsoleLog(logging.Handler):
@@ -117,11 +129,13 @@ class ConsoleLog(logging.Handler):
     def mark_activation(self):
         self.activation = time.time()
 
-    def lines(self, limit: int = 100, since_activation: bool = False) -> list[dict]:
+    def lines(self, limit: int = 100, since_activation: bool = False, category: str = "all") -> list[dict]:
         with self.lock2:
             items = list(self.items)
         if since_activation:
             items = [i for i in items if i["ts"] >= self.activation]
+        if category in ("actions", "errors"):
+            items = [i for i in items if in_category(i, category)]
         return items[-limit:] if limit else items
 
     def scrub(self, terms: set[str]) -> int:

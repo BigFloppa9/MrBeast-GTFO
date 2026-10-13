@@ -265,7 +265,7 @@ const I18N = {
     "servers.punish": "Punishment",
     "servers.punish_hint": "What the bot does after detecting a compromised account. Repeated detections of the same user on this server move through the steps below.",
     "servers.reset_days": "Reset detections after (days)",
-    "servers.reset_days_hint": "The counter of a user is cleared after this many days without new detections (1–90). Nothing is kept longer than 90 days.",
+    "servers.reset_days_hint": "The counter of a user is cleared after this many days without new detections (1–30). Nothing is kept longer than 30 days.",
     "preset.default": "One action",
     "preset.ladder": "4 detections, then a ban",
     "preset.ladder_ban": "Ban at the first detection",
@@ -286,7 +286,7 @@ const I18N = {
     "err.preset_invalid": "Unknown punishment preset.",
     "err.steps_invalid": "Some step has invalid values.",
     "err.steps_empty": "Add at least one step for the custom preset.",
-    "err.reset_days_range": "Days must be between 1 and 90.",
+    "err.reset_days_range": "Days must be between 1 and 30.",
     "err.dm_notify_invalid": "Invalid value.",
     "proxy.edit": "Edit",
     "proxy.form": "Add via form",
@@ -377,8 +377,11 @@ const I18N = {
     "console.export": "Export",
     "console.scope_all": "All",
     "console.scope_session": "Since the last bot start",
+    "console.cat_all": "All",
+    "console.cat_actions": "Actions",
+    "console.cat_errors": "Errors",
     "data.title": "Transfer settings",
-    "data.hint": "Saves server settings, punishment presets, reasons, detection counters and proxies to a file. User IDs and proxy data are encrypted with a password you set on export. Offenders and logs are not included. Anything older than 90 days is dropped on import.",
+    "data.hint": "Saves server settings, punishment presets, reasons, detection counters and proxies to a file. User IDs and proxy data are encrypted with a password you set on export. Offenders and logs are not included. Anything older than 30 days is dropped on import.",
     "data.passphrase": "Passphrase",
     "data.export": "Export",
     "data.import": "Import",
@@ -672,7 +675,7 @@ const I18N = {
     "servers.punish": "Наказание",
     "servers.punish_hint": "Что бот делает после обнаружения взломанного аккаунта. Повторные обнаружения того же пользователя на этом сервере проходят по шагам ниже.",
     "servers.reset_days": "Сбрасывать обнаружения через (дней)",
-    "servers.reset_days_hint": "Счётчик пользователя очищается, если столько дней не было новых обнаружений (1–90). Дольше 90 дней ничего не хранится.",
+    "servers.reset_days_hint": "Счётчик пользователя очищается, если столько дней не было новых обнаружений (1–30). Дольше 30 дней ничего не хранится.",
     "preset.default": "Одно действие",
     "preset.ladder": "4 обнаружения с последующей блокировкой",
     "preset.ladder_ban": "Бан при первом обнаружении",
@@ -693,7 +696,7 @@ const I18N = {
     "err.preset_invalid": "Неизвестный пресет наказания.",
     "err.steps_invalid": "В каком-то шаге неверные значения.",
     "err.steps_empty": "Добавьте хотя бы один шаг для своего пресета.",
-    "err.reset_days_range": "Дней должно быть от 1 до 90.",
+    "err.reset_days_range": "Дней должно быть от 1 до 30.",
     "err.dm_notify_invalid": "Неверное значение.",
     "proxy.edit": "Изменить",
     "proxy.form": "Добавить через форму",
@@ -784,8 +787,11 @@ const I18N = {
     "console.export": "Экспорт",
     "console.scope_all": "Всё",
     "console.scope_session": "С последнего запуска бота",
+    "console.cat_all": "Все",
+    "console.cat_actions": "Действия",
+    "console.cat_errors": "Ошибки",
     "data.title": "Перенос настроек",
-    "data.hint": "Сохраняет в файл настройки серверов, пресеты наказаний, причины, счётчики обнаружений и прокси. ID пользователей и данные прокси шифруются паролем, который вы задаёте при экспорте. Нарушители и логи не включаются. Всё старше 90 дней отбрасывается при импорте.",
+    "data.hint": "Сохраняет в файл настройки серверов, пресеты наказаний, причины, счётчики обнаружений и прокси. ID пользователей и данные прокси шифруются паролем, который вы задаёте при экспорте. Нарушители и логи не включаются. Всё старше 30 дней отбрасывается при импорте.",
     "data.passphrase": "Парольная фраза",
     "data.export": "Экспорт",
     "data.import": "Импорт",
@@ -1430,6 +1436,7 @@ function renderDashboard() {
 
   async function paintTab() {
     content.className = "content";
+    content.onscroll = null;
     if (ui.tab === "logs") renderLogsTab(content);
     else if (ui.tab === "status") { await refreshConsole(20); if (ui.tab === "status") renderStatusTab(content); }
     else if (ui.tab === "servers") renderServersTab(content);
@@ -1488,16 +1495,28 @@ function currentBot() {
 }
 
 let feedKey = "";
+let feedStick = true;
+const phoneQuery = window.matchMedia("(max-width: 760px)");
+
+function nearBottom(box) {
+  return box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+}
+
 function repaintFeed() {
   const feed = document.getElementById("feed");
   if (!feed) return;
   const bot = currentBot();
-  const key = lastLogId + ":" + logs.length + ":" + (bot ? bot.avatar : "") + ":" + LANG;
+  const bottomUp = !phoneQuery.matches;
+  const key = lastLogId + ":" + logs.length + ":" + (bot ? bot.avatar : "") + ":" + LANG + ":" + bottomUp;
   if (key === feedKey) return;
   feedKey = key;
+  const box = feed.parentElement;
+  const keepTop = box.scrollTop;
   const nodes = [];
   let day = null;
-  for (let i = logs.length - 1; i >= 0; i--) {
+  const order = logs.map((entry, i) => i);
+  if (!bottomUp) order.reverse();
+  for (const i of order) {
     const entry = logs[i];
     const entryDay = dayKey(entry.ts);
     if (entryDay !== day) {
@@ -1508,13 +1527,27 @@ function repaintFeed() {
   }
   if (!nodes.length) nodes.push(h("div", { class: "empty" }, tr("logs.empty")));
   feed.replaceChildren(...nodes);
+  if (bottomUp && feedStick) {
+    box.scrollTop = box.scrollHeight;
+    requestAnimationFrame(() => { if (feedStick) box.scrollTop = box.scrollHeight; });
+  } else {
+    box.scrollTop = keepTop;
+  }
 }
 
 function renderLogsTab(content) {
   feedKey = "";
+  feedStick = true;
   content.replaceChildren(h("div", { class: "feed", id: "feed" }));
+  content.onscroll = () => { if (!phoneQuery.matches) feedStick = nearBottom(content); };
   repaintFeed();
 }
+
+phoneQuery.addEventListener("change", () => {
+  feedStick = true;
+  feedKey = "";
+  if (ui.tab === "logs") repaintFeed();
+});
 
 function stat(label, value) {
   return h("div", { class: "stat" }, h("b", {}, value), h("span", {}, label));
@@ -1590,7 +1623,7 @@ function renderStatusTab(content) {
   nodes.push(h("div", { class: "status-cards" },
     h("div", { class: "section fit" }, h("h3", {}, tr("bot.controls")),
       paused ? h("p", { class: "meta" }, tr("bot.paused_hint")) : null,
-      h("div", { class: "actions" }, buttons)),
+      h("div", { class: "actions ctl-actions" }, buttons)),
     (() => {
       const net = statusData.network;
       if (!net || !net.addresses.length) return null;
@@ -1646,7 +1679,7 @@ async function loadGuild(body, guildId) {
   const images = h("input", { type: "number", min: "1", max: "50", value: s.auto_min_images });
   const channels = h("input", { type: "number", min: "1", max: "50", value: s.auto_min_channels });
   const windowSeconds = h("input", { type: "number", min: "1", max: "3600", value: s.auto_window_seconds });
-  const resetDays = h("input", { type: "number", min: "1", max: "90", value: s.warn_reset_days });
+  const resetDays = h("input", { type: "number", min: "1", max: "30", value: s.warn_reset_days });
   const dm = h("input", { type: "checkbox" });
   dm.checked = s.dm_notify;
   const save = h("button", { class: "btn", type: "submit" }, tr("servers.save"));
@@ -1818,8 +1851,8 @@ function renderModerator() {
 function updateSection() {
   const result = h("div", {});
   const changes = h("div", { class: "changes-box", hidden: true });
-  const closeButton = h("button", { class: "pop-close", type: "button", title: "×", onclick: () => closePop() }, "×");
-  const pop = h("div", { class: "update-pop", hidden: true }, closeButton, changes, result);
+  const pop = h("div", { class: "update-pop", hidden: true }, changes, result);
+  let applying = false;
   const password = h("input", { type: "password", autocomplete: "current-password" });
   const version = h("b", {}, "…");
   const checkButton = h("button", { class: "btn secondary small", type: "button", onclick: () => check() },
@@ -1886,6 +1919,7 @@ function updateSection() {
   async function apply() {
     const res = await api("POST", "/api/update/apply", { password: password.value });
     if (!res.ok) { toast(errorText(res), "error"); return; }
+    applying = true;
     stopTimers();
     const label = h("p", { class: "meta" }, tr("update.running"));
     show(label);
@@ -1906,11 +1940,18 @@ function updateSection() {
     }, 1500);
   }
 
-  return h("div", { class: "update-card" },
+  const card = h("div", { class: "update-card" },
     h("div", { class: "update-top" },
       h("div", { class: "update-version" }, h("span", { class: "meta" }, tr("update.label")), version),
       toggleButton, checkButton),
     pop);
+  if (window.updateOutside) document.removeEventListener("click", window.updateOutside);
+  window.updateOutside = event => {
+    if (!card.isConnected || applying || pop.hidden || event.composedPath().includes(card)) return;
+    closePop();
+  };
+  document.addEventListener("click", window.updateOutside);
+  return card;
 }
 
 function privacySection() {
@@ -2570,9 +2611,11 @@ function renderConsoleTab(content) {
   const box = h("pre", { class: "console-box fill" }, "…");
   const scope = h("select", {}, h("option", { value: "all" }, tr("console.scope_all")), h("option", { value: "session" }, tr("console.scope_session")));
   const format = h("select", {}, ["txt", "json", "csv"].map(f => h("option", { value: f }, f.toUpperCase())));
+  const category = h("select", {}, ["all", "actions", "errors"].map(c => h("option", { value: c }, tr("console.cat_" + c))));
+  category.addEventListener("change", () => { first = true; refresh(); });
   let first = true;
   async function refresh() {
-    const res = await api("GET", "/api/console?limit=300");
+    const res = await api("GET", "/api/console?limit=300&category=" + category.value);
     if (!res.ok) return;
     const atBottom = first || box.scrollHeight - box.scrollTop - box.clientHeight < 40;
     box.textContent = res.lines.length ? res.lines.map(consoleLine).join("\n") : tr("console.empty");
@@ -2581,8 +2624,8 @@ function renderConsoleTab(content) {
   }
   consoleRefresh = refresh;
   content.replaceChildren(h("div", { class: "console-page" },
-    h("div", { class: "console-bar" }, scope, format,
-      h("button", { class: "btn", type: "button", onclick: () => { window.location.href = "/api/console/export?format=" + format.value + "&scope=" + scope.value; } }, tr("console.export"))),
+    h("div", { class: "console-bar" }, scope, format, category,
+      h("button", { class: "btn", type: "button", onclick: () => { window.location.href = "/api/console/export?format=" + format.value + "&scope=" + scope.value + "&category=" + category.value; } }, tr("console.export"))),
     h("p", { class: "meta" }, tr("console.hint", { n: 300 })),
     box));
   refresh();

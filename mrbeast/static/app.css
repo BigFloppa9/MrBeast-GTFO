@@ -372,10 +372,10 @@ html[data-kos] .proxy-row.active { box-shadow: inset 3px 0 0 var(--selected); }
 .section.raised { position: relative; z-index: 40; }
 html[data-kos] .picker-pop { background: #14141a; }
 
-.capsule { background: rgba(148,155,164,.25); border: 1px solid rgba(148,155,164,.35); color: var(--text-strong); }
-.capsule.green { background: rgba(35,165,89,.28); border-color: rgba(35,165,89,.55); color: #7fe3a8; }
-.capsule.red { background: rgba(237,66,69,.28); border-color: rgba(237,66,69,.55); color: #ff9a9c; }
-.capsule.orange { background: rgba(240,178,50,.25); border-color: rgba(240,178,50,.55); color: #f6cf72; }
+.capsule { background: rgba(148,155,164,.14); border: 1px solid rgba(148,155,164,.3); color: var(--text-strong); }
+.capsule.green { background: rgba(35,165,89,.16); border-color: rgba(35,165,89,.4); color: #7fe3a8; }
+.capsule.red { background: rgba(237,66,69,.16); border-color: rgba(237,66,69,.4); color: #ff9a9c; }
+.capsule.orange { background: rgba(240,178,50,.15); border-color: rgba(240,178,50,.4); color: #f6cf72; }
 .brand-box { padding-bottom: 10px; }
 .brand-box .brand { padding-bottom: 3px; }
 .brand-box .capsule { margin-top: 0; }
@@ -429,4 +429,22 @@ html[data-kos] .update-pop { background: #14141a; }
   .update-version .meta { display: none; }
   .update-card { padding: 6px 10px; }
   .settings-side { justify-self: stretch; }
+}
+
+/* 2.6.3 */
+.update-version { align-items: center; }
+.update-version .meta { margin: 0; }
+.update-version b { line-height: 1.2; }
+.pop-close { display: none; }
+
+@media (max-width: 760px) {
+  .brand-box { padding: 0 8px 0 0; align-items: center; }
+  .brand-box .brand { padding: 8px 4px 8px 12px; }
+  .brand-box .capsule { align-self: center; margin: 0; }
+  .ctl-actions { flex-direction: column; align-items: stretch; }
+  .ctl-actions .btn { width: 100%; }
+  .settings-side { position: static; }
+  .console-bar { flex-wrap: wrap; }
+  .console-bar select { flex: 1 1 0; min-width: 0; padding: 10px 22px 10px 8px; background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%; }
+  .console-bar .btn { flex: 1 0 100%; }
 }

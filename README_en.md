@@ -158,7 +158,7 @@ Channels that regular users can't see (for example the log channel): the bot's r
 
 | Section | Contents |
 |---|---|
-| **Offenders** | Latest records as Discord-style messages: offender display name, username and ID, trigger text, channel link, images (identical ones stored once), action. Updates automatically |
+| **Offenders** | Latest records as Discord-style messages: offender display name, username and ID, trigger text, channel link, images (identical ones stored once), action. Updates automatically. On desktop the feed works like Discord: newest records at the bottom, the tab opens scrolled to the bottom and scrolling up shows older ones; on phones the newest records are at the top |
 | **Status** | Ping, uptime, control buttons, panel addresses on the network, the last 20 console lines. The bot's state is a coloured capsule under its name on the left (green: online, orange: connecting, red: paused or stopped) |
 | **Servers** | The server list and per server: punishment preset, steps, reasons, detection reset period, log channel, auto-detection thresholds |
 | **Proxy** | The add form is at the top. Single proxies are a plain list, subscriptions expand with an arrow (the link is hidden by a "spoiler": a click shows or hides it, right-click copies it). Every server shows ping in ms, the provider's description, a manual ping button (speedometer icon, for a subscription it checks all its servers) and an editor. A server that is down shows a countdown to automatic removal |
@@ -251,7 +251,7 @@ python tools/subscription.py "https://provider/sub/…" -o servers.txt
 
 <br>
 
-In **Settings → Remove user data** enter the username (not the display name) or the ID. The panel shows the number of matching records. After confirmation, the display name, username and ID in those records are replaced with `null`, and the stored message text and images are removed; detection counters and console log lines mentioning the user are erased as well. A record with ID `null` is considered erased; a user whose name is literally "null" is not. The bot also deletes **its own** log messages about that user in the log channels of all servers (using the saved message references and by reading the channel history for 90 days); other messages are never touched. If the bot is offline, the Discord channels are not checked.
+In **Settings → Remove user data** enter the username (not the display name) or the ID. The panel shows the number of matching records. After confirmation, the display name, username and ID in those records are replaced with `null`, and the stored message text and images are removed; detection counters and console log lines mentioning the user are erased as well. A record with ID `null` is considered erased; a user whose name is literally "null" is not. The bot also deletes **its own** log messages about that user in the log channels of all servers (using the saved message references and by reading the channel history for 30 days); other messages are never touched. If the bot is offline, the Discord channels are not checked.
 
 </details>
 
@@ -269,7 +269,7 @@ In the **Servers** tab each server gets a preset:
 | Ban at the first detection | ban and deletion of messages for 1 day |
 | Custom | up to 8 steps: action (timeout or ban), length, deletion period and reason for each |
 
-The detection counter is kept per user per server and resets after the configured number of days without violations (30 by default, 90 at most). Nothing is stored longer than 90 days. The reason is written to the audit log; sending it to the offender in a direct message is off by default and is enabled with a checkbox in the server settings. On a ban Discord deletes messages for the chosen period (7 days at most).
+The detection counter is kept per user per server and resets after the configured number of days without violations (30 by default and at most). Nothing is stored longer than 30 days. The reason is written to the audit log; sending it to the offender in a direct message is off by default and is enabled with a checkbox in the server settings. On a ban Discord deletes messages for the chosen period (7 days at most).
 
 </details>
 
@@ -278,8 +278,8 @@ The detection counter is kept per user per server and resets after the configure
 
 <br>
 
-- **Settings → Transfer settings**: "Import" on the left, "Export" on the right. Export asks for a password and saves a file with server settings, presets, reasons, counters and proxies (subscriptions together with their servers, as they currently are in the list); user IDs and proxy data are encrypted with that password, offenders and logs are not included. Import opens a file picker, checks the file and asks for the password; records older than 90 days are dropped.
-- The **Logs** tab (between "Proxy" and "Settings") shows the console log across the whole page, the last 300 lines with auto-refresh; export as txt, json or csv, for everything stored or since the last bot start. The file `data/console.log` keeps up to 2000 lines for 30 days.
+- **Settings → Transfer settings**: "Import" on the left, "Export" on the right. Export asks for a password and saves a file with server settings, presets, reasons, counters and proxies (subscriptions together with their servers, as they currently are in the list); user IDs and proxy data are encrypted with that password, offenders and logs are not included. Import opens a file picker, checks the file and asks for the password; records older than 30 days are dropped.
+- The **Logs** tab (between "Proxy" and "Settings") shows the console log across the whole page, the last 300 lines with auto-refresh; export as txt, json or csv, for everything stored or since the last bot start. A third list filters events: "All", "Actions" (detections and blocks) and "Errors" (failures and warnings); the filter applies both to the screen and to the export. The file `data/console.log` keeps up to 2000 lines for 30 days.
 - The version block at the top right of **Settings**: "Show changes" expands the latest commits (needs a git installation), "Check for update" runs the usual check.
 
 Restart messages in the console log:

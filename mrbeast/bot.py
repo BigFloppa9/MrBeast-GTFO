@@ -22,7 +22,7 @@ logger = logging.getLogger("mrbeast.bot")
 DISCORD_MAX_TIMEOUT = timedelta(days=28)
 MEDIA_DOMAINS = ("discordapp.com", "discordapp.net")
 MAX_DOWNLOADS = 12
-RETENTION_SCAN_DAYS = 90
+RETENTION_SCAN_DAYS = 30
 SCAN_LIMIT = 3000
 TRACK_QUIET = 10
 TRACK_MAX = 30
@@ -256,7 +256,7 @@ def build_embed(source: str, target: discord.Member, s: dict, deleted: int | Non
     embed.add_field(name=t(lg, "offender"), value=f"{target.mention} (`{target.id}`)", inline=False)
     if auto and trigger_msg is not None:
         content = (trigger_msg.content or t(lg, "image_placeholder"))[:900]
-        embed.add_field(name=t(lg, "trigger"), value=f"[Jump]({trigger_msg.jump_url})\n{content}", inline=False)
+        embed.add_field(name=t(lg, "trigger"), value=f"{trigger_msg.channel.mention}\n{content}", inline=False)
     if moderator is not None:
         embed.add_field(name=t(lg, "moderator"), value=moderator.mention, inline=False)
     step = step or {"action": "timeout", "duration": s["timeout_duration"], "delete": s["delete_window"]}
@@ -271,8 +271,6 @@ def build_embed(source: str, target: discord.Member, s: dict, deleted: int | Non
     if strike and strike[1] > 1:
         lines.insert(0, t(lg, "strike_line", n=strike[0], total=strike[1]))
     embed.add_field(name=t(lg, "action"), value="\n".join(lines), inline=False)
-    if auto and trigger_msg is not None:
-        embed.set_footer(text=f"#{trigger_msg.channel.name}")
     return embed
 
 

@@ -446,7 +446,12 @@ async def api_console(request: web.Request):
         limit = max(1, min(int(request.query.get("limit", "100")), 500))
     except ValueError:
         limit = 100
-    return ok(lines=console.lines(limit))
+    return ok(lines=console.lines(limit, category=console_category(request)))
+
+
+def console_category(request: web.Request) -> str:
+    value = request.query.get("category", "all")
+    return value if value in ("all", "actions", "errors") else "all"
 
 
 def console_text(item: dict) -> str:
@@ -456,7 +461,7 @@ def console_text(item: dict) -> str:
 
 async def api_console_export(request: web.Request):
     fmt = request.query.get("format", "txt")
-    items = console.lines(0, request.query.get("scope") == "session")
+    items = console.lines(0, request.query.get("scope") == "session", console_category(request))
     stamp = time.strftime("%Y%m%d-%H%M%S")
     if fmt == "json":
         body, kind, ext = json.dumps(items, ensure_ascii=False, indent=1), "application/json", "json"

@@ -11,7 +11,7 @@ MrBeast GTFO is an open-source anti-scam moderation bot. It targets one specific
 
 1. Auto-detection. If one user posts at least N images in at least M different channels within K seconds (default 4 / 2 / 10, adjustable per server), the bot treats the account as hijacked.
 2. Action. It applies a timeout (default 1 day, max 28 days) with a reason shown in the audit log that tells the victim to change passwords, revoke sessions and enable 2FA. It then deletes that user's recent messages across channels where the bot has Read Message History and Manage Messages.
-3. Reporting. It posts an embed report to a log channel chosen by the server admin: offender, trigger text, channel, timeout and number of deleted messages.
+3. Reporting. It posts an embed report to a log channel chosen by the server admin: offender, a clickable link to the channel, trigger text, timeout and number of deleted messages.
 4. Manual use. Moderators with Moderate Members can use /mrbeast <user> to apply the same action.
 5. Configuration. Server admins use /mrbeastlog and /mrbeastconfig, or a password-protected web control panel hosted by the bot operator (logs, status, per-server settings).
 
@@ -29,11 +29,11 @@ View Channels, Read Message History, Manage Messages, Moderate Members, Send Mes
 
 ## Data handling
 
-Messages of non-offending users are never stored. When a user is punished, an incident record is kept on the operator's own device: user ID, display name, username, the first 69 characters of the trigger text, the channel, up to 8 distinct images from the offending messages (no video) and the action taken. Records and images are encrypted at rest, kept at most 30 days (and at most 300 records), never shared, sold, or used for ML training. See the privacy policy for details.
+Messages of non-offending users are never stored. When a user is punished, an incident record is kept on the operator's own device: user ID, display name, username, the first 69 characters of the trigger text, the channel, up to 8 distinct images from the offending messages (no video) and the action taken. Records and images are encrypted at rest, kept at most 30 days (and at most 300 records), never shared, sold, or used for ML training. The per-server detection counters (user ID, count, time of the last detection) and the console log are also kept for 30 days at most, and the bot only reads its own report messages in the log channel within the last 30 days when erasing a user. See the privacy policy for details.
 
 ## Note on demo material
 
-The privileged intents of the production application are currently disabled, so a live demonstration (screenshots or video) cannot be produced right now. The full source code is public: any question about how the application works can be answered by reviewing it directly or with an automated / AI-assisted code review. The sections below point to the relevant places.
+The privileged intents of the production application are disabled until this review is finished. The screenshots linked in the application were taken on a test application running the same code. The full source code is public: any question about how the application works can be answered by reviewing it directly or with an automated / AI-assisted code review. The sections below point to the relevant places.
 
 ## Where to verify this in the code
 
@@ -42,6 +42,8 @@ The privileged intents of the production application are currently disabled, so 
 - mrbeast/bot.py, `purge_messages`: deletion of the offender's messages.
 - mrbeast/bot.py, `build_embed` and `record_log`: exactly what is reported and logged.
 - mrbeast/logstore.py: retention (30 days / 300 records), image storage and encryption at rest.
+- mrbeast/strikes.py and mrbeast/config.py (`RETENTION_DAYS = 30`): detection counters, never kept longer than 30 days.
+- mrbeast/consolelog.py: console log, at most 30 days.
 - The bot makes no network requests except to the Discord API and the Discord CDN (to save images of offending messages).
 
 ## How to test
