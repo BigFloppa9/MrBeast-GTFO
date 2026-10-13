@@ -384,4 +384,6 @@ python tools/subscription.py "https://провайдер/sub/…" -o servers.txt
 
 <b>BigFloppa9</b>
 
+Copyright (C) 2026 BigFloppa9. Лицензия: GPL-3.0.
+
 </div>

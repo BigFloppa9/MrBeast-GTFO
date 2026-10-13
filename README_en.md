@@ -384,4 +384,6 @@ The token, logs and images are encrypted (Fernet) and the key sits in a separate
 
 <b>BigFloppa9</b>
 
+Copyright (C) 2026 BigFloppa9. Licensed under GPL-3.0.
+
 </div>
